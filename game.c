@@ -4,6 +4,8 @@
 #include <time.h>
 #include <string.h>
 #include <endian.h>
+#include <limits.h>
+
 
 #define MAX_ROOMS 10
 #define MIN_X_ROOM 4
@@ -25,6 +27,13 @@ typedef enum action{
 	load_save
 } user_action;
 
+typedef struct{
+	int x; //x-coordinate
+	int y; //y-coordinate
+	int w; //weight
+	int v; //???
+} Cell;
+
 void generateDungeon(char dungeonArray[WINDOW_Y][WINDOW_X], int hardnessArray[gameHeight][gameWidth]){
 	int i, j;
 	int loadingDungeon = FALSE;
@@ -43,7 +52,7 @@ void generateDungeon(char dungeonArray[WINDOW_Y][WINDOW_X], int hardnessArray[ga
 			} else if(j < gameWidth - 1 && i < gameHeight - 1) {
 				dungeonArray[i][j] = ' ';
 				if(!loadingDungeon){
-					hardnessArray[i][j] = 127;
+					hardnessArray[i][j] = 1 + rand() % 253;
 				}
 			} else {
 				dungeonArray[i][j] = ' ';
@@ -52,10 +61,9 @@ void generateDungeon(char dungeonArray[WINDOW_Y][WINDOW_X], int hardnessArray[ga
 	}
 }
 
-void generateRooms(int roomsArray[MAX_ROOMS][MAX_CONSTRAINTS], char dungeonArray[WINDOW_Y][WINDOW_X], int pc_location[2], int hardnessArray[gameHeight][gameWidth], int *numRooms){
+void generateRooms(int roomsArray[MAX_ROOMS][MAX_CONSTRAINTS], char dungeonArray[WINDOW_Y][WINDOW_X], int hardnessArray[gameHeight][gameWidth], int *numRooms){
 	int totalArea = 0;
 	int i, j;
-	int pcPlaced = FALSE;
 	int roomBuffer = *numRooms;
 	int loadingDungeon = FALSE;
 	if(*numRooms != 0){
@@ -100,12 +108,6 @@ void generateRooms(int roomsArray[MAX_ROOMS][MAX_CONSTRAINTS], char dungeonArray
 					dungeonArray[roomsArray[*numRooms - roomBuffer][1] + i][roomsArray[*numRooms - roomBuffer][0] + j] = '.';
 					if(hardnessArray[roomsArray[*numRooms - roomBuffer][1] + i][roomsArray[*numRooms - roomBuffer][0] + j] != 0){
 						hardnessArray[roomsArray[*numRooms - roomBuffer][1] + i][roomsArray[*numRooms - roomBuffer][0] + j] = 0;
-					}
-					if(pcPlaced == FALSE){
-						dungeonArray[roomsArray[*numRooms - roomBuffer][1] + i][roomsArray[*numRooms - roomBuffer][0] + j] = '@';
-						pc_location[0] = roomsArray[*numRooms - roomBuffer][1] + i;
-						pc_location[1] = roomsArray[*numRooms - roomBuffer][0] + j;
-						pcPlaced = TRUE;
 					}
 				}
 			}
@@ -176,9 +178,13 @@ void generateCorridors(char dungeon[WINDOW_Y][WINDOW_X], int rooms[MAX_ROOMS][MA
 	}
 }
 
-void generateStairs(char dungeon[WINDOW_Y][WINDOW_X], int hardnessArray[gameHeight][gameWidth], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], int *numUpCases, int *numDownCases){
+void generateStairs(char dungeon[WINDOW_Y][WINDOW_X], int hardnessArray[gameHeight][gameWidth], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], int *numUpCases, int *numDownCases, int pc_location[2]){
 	int i, randomX, randomY;
 	
+	/*
+	Boolean int to track whether the pc was randomly placed within a room or corridor
+	*/
+	int pcPlaced = FALSE;	
 	/*
 	Boolean int to track whether we're reading in loaded data 
 	or creating new data.
@@ -213,6 +219,18 @@ void generateStairs(char dungeon[WINDOW_Y][WINDOW_X], int hardnessArray[gameHeig
 				*numDownCases = *numDownCases + 1;
 			}
 		}
+		
+		while(!pcPlaced){
+			randomY = 1 + rand() % gameHeight - 1;
+			randomX = 1 + rand() % gameWidth - 2;
+			if((hardnessArray[randomY][randomX] == 0) && dungeon[randomY][randomX] != '>' && dungeon[randomY][randomX] != '<'){
+				dungeon[randomY][randomX] = '@';
+				pc_location[0] = randomX;
+				pc_location[1] = randomY;
+				pcPlaced = TRUE;
+			}
+		}
+		
 	} else{
 		for(i = 0; i < *numUpCases; i++){
 			dungeon[upwardCases[i][1]][upwardCases[i][0]] = '<';
@@ -220,6 +238,7 @@ void generateStairs(char dungeon[WINDOW_Y][WINDOW_X], int hardnessArray[gameHeig
 		for(i = 0; i < *numDownCases; i++){
 			dungeon[downwardCases[i][1]][downwardCases[i][0]] = '>';
 		}
+		dungeon[pc_location[1]][pc_location[0]] = '@';
 	}
 }
 
@@ -464,6 +483,7 @@ void saveDungeon(int hardness[gameHeight][gameWidth], char *directory, int pc[2]
 	
 }
 
+
 int main(int argc, char *argv[]){
 	int number_of_rooms = 0; //holds values for number of rooms generated in the dungeon
 	int number_of_upstairs = 0; //holds values for number of upcases generated in the dungeon
@@ -506,18 +526,29 @@ int main(int argc, char *argv[]){
 	1: x-coordinate
 	*/
 	
+	int roomMap[gameHeight][gameWidth];
+	/*
+	contains open space distance map from PC based on Dijkstra's alg
+	*/
+	
+	int wholeMap[gameHeight][gameWidth];
+	/*
+	contains whole distance map from PC based on Dijkstra's alg
+	*/
+	
 	//Takes the time to randomize our room generation
 	srand(time(NULL));
 	
-	/*
+	
 	char *home = getenv("HOME");
 	char *directory;
-	directory = malloc(strlen(home) + strlen("/.rlg327/dungeon") + 1);
+	directory = malloc(strlen(home) + strlen("/.rlg327/hello.rlg327") + 1);
 	strcpy(directory, home);
-	strcat(directory, "/.rlg327/dungeon");
-	*/
+	strcat(directory, "/.rlg327/hello.rlg327");
 	
-	char *directory = "C:/Users/morro/.rlg327/dungeon.txt";
+	
+	//char *directory = "C:/Users/morro/.rlg327/dungeon.txt";
+	
 	
 	user_action action;
 	if(!strcmp(argv[1], "--save")){
@@ -535,17 +566,17 @@ int main(int argc, char *argv[]){
 		case load:
 			loadDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 			generateDungeon(dungeon, hardness);
-			generateRooms(rooms, dungeon, PC, hardness, &number_of_rooms);
+			generateRooms(rooms, dungeon, hardness, &number_of_rooms);
 			generateCorridors(dungeon, rooms, &number_of_rooms, hardness, &number_of_upstairs);
-			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs);
+			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, PC);
 			printDungeon(dungeon);
 			// free(directory);	
 			break;
 		case save:
 			generateDungeon(dungeon, hardness);
-			generateRooms(rooms, dungeon, PC, hardness, &number_of_rooms);
+			generateRooms(rooms, dungeon, hardness, &number_of_rooms);
 			generateCorridors(dungeon, rooms, &number_of_rooms, hardness, &number_of_upstairs);
-			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs);
+			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, PC);
 			printDungeon(dungeon);
 			saveDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 			// free(directory);
@@ -553,9 +584,9 @@ int main(int argc, char *argv[]){
 		case load_save:
 			loadDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 			generateDungeon(dungeon, hardness);
-			generateRooms(rooms, dungeon, PC, hardness, &number_of_rooms);
+			generateRooms(rooms, dungeon, hardness, &number_of_rooms);
 			generateCorridors(dungeon, rooms, &number_of_rooms, hardness, &number_of_upstairs);
-			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs);
+			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, PC);
 			printDungeon(dungeon);
 			saveDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 			// free(directory);

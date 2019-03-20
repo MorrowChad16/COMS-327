@@ -1,13 +1,11 @@
-gameGenerator creates a dungeon with 6 or more randomly generated rooms that are connected by at least one corridor.
-A random up and down stairs is added throughout the playable dungeon
+This combined program creates an 80x21 dungeon with random room location and sizes, corridors connecting them, and stairs.
 
-generateDungeon creates the 80x24 window with a border for the playable area
+The save_dungeon function will load a new dungeon, print the dungeon, and then save the contents of the dungeon with the a file marker, file size, and file type. 
+It saves only the "shell" of the key pieces of rooms and staircase locations.
 
-generateRooms creates and adds 6 or more rooms to the dungeon area. It returns the number of rooms for generateCorridors
+load_dungeon will go to the path assigned and read the binary info within the file and save the contents to the necessary 
+variables. It will then print the dungeon and exit.
 
-generateCorridors connects the rooms through Euclidean formula
+A switch case with check for --save, --load, and --load--save DO NOT ADD A SPACE IN BETWEEN LOAD AND SAVE!!!
 
-generateStairs searches randomly through the area to add stairs
-
-printDungeon will finally print the finished dungeon
-
+YOU MUST ENTER AT LEAST ONE CHARACTER TO RECEIVE AN ERROR MESSAGE OR RUN A COMMAND! IF NOT YOU WILL RECIEVE A SEGEMENTATION ERROR!
