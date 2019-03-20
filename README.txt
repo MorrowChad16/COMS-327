@@ -1,12 +1,22 @@
-This builds on HW 1.01 and 1.02
+This program builds on previous assignments
 
-Added functionality is created with a "room heat map" which use dijstras algorithm
-originating at the PC's location. The cost within the rooms is 1. We factor by 10 to 
-get single digit values
+This edition adds monsters with random qualities
+Monsters can have intelligence, telepathy, tunnelling and erratic behavior
 
-The "whole heap map" is essentially the same except the hardness is / 85 to get a range between 1-3 for the cost and
-the hardness check when adding cost to the map is eleminated
+Intelligence allows the monster to use the roomMap or wholeMap to calculate the shortest path
 
-No special measures are needed to run the program. Simply run --save, --load, --load--save and it will print the heat maps
+Telepathy allows the monster to always remember the PC's location
 
-The print functions for both are similar they read in the arrays and print only the heat signatures, replacing empty space with ' ' and walls with 'X'
+Tunnelling allows the PC to go through mutable rock
+
+Erratic behavior has a 50% chance of randomly moving to a neighbors cell rather than towards the PC
+
+Monsters are defaulted to move randomly if they can't see the PC
+
+Each characteristic has a 50% of being true
+
+Added a "--nummon" (INT) to allow the user a varying number of monsters
+
+The default value is 1 monsters
+
+The MAX MONSTER size is 20!!!!!!
