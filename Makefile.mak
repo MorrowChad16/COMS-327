@@ -1,7 +1,8 @@
-all: game
-		
-game: game.c heap.c
-	gcc -g3 game.c heap.c -lncurses -o game
+all: hello
+	
+sobel: sobel.c
+	gcc -Wall -Werror -g3 sobel.c -o sobel
 	
 clean: 
-	rm game
+	rm sobel
+	
