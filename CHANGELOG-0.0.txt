@@ -1,7 +1,0 @@
-1-15: I applied the pseudocode provided
-1-20: I created the X and Y kernel arrays needed for calculations. 
-I realized I need to double the pseudocode and apply a final nested for loop
-to combine the X and Y out arrays.
-1-21: I was receiving a Segmentation Error due to buffer range issues with the 1024x1024 arrays.
-I moved them outside of the main function and the error left.
-1-22: I changed my starting values for c and r to 1 instead of 0 to eliminate an error value.
