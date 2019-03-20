@@ -1,7 +1,7 @@
 all: game
 		
 game: game.c heap.c
-	gcc -g3 game.c -o game
+	gcc -g3 game.c heap.c -o game
 	
 clean: 
 	rm game

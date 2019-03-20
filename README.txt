@@ -1,11 +1,12 @@
-This combined program creates an 80x21 dungeon with random room location and sizes, corridors connecting them, and stairs.
+This builds on HW 1.01 and 1.02
 
-The save_dungeon function will load a new dungeon, print the dungeon, and then save the contents of the dungeon with the a file marker, file size, and file type. 
-It saves only the "shell" of the key pieces of rooms and staircase locations.
+Added functionality is created with a "room heat map" which use dijstras algorithm
+originating at the PC's location. The cost within the rooms is 1. We factor by 10 to 
+get single digit values
 
-load_dungeon will go to the path assigned and read the binary info within the file and save the contents to the necessary 
-variables. It will then print the dungeon and exit.
+The "whole heap map" is essentially the same except the hardness is / 85 to get a range between 1-3 for the cost and
+the hardness check when adding cost to the map is eleminated
 
-A switch case with check for --save, --load, and --load--save DO NOT ADD A SPACE IN BETWEEN LOAD AND SAVE!!!
+No special measures are needed to run the program. Simply run --save, --load, --load--save and it will print the heat maps
 
-YOU MUST ENTER AT LEAST ONE CHARACTER TO RECEIVE AN ERROR MESSAGE OR RUN A COMMAND! IF NOT YOU WILL RECIEVE A SEGEMENTATION ERROR!
+The print functions for both are similar they read in the arrays and print only the heat signatures, replacing empty space with ' ' and walls with 'X'
