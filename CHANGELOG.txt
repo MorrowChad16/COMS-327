@@ -21,3 +21,19 @@ Failed to implement switch case due to confusion with calling them
 
 2-7: I fixed the stair issue, I was calling the wrong address of the saved file for the coordinates and number
 The switch was implemented with --save, --load, and --load--save
+
+2-9: I created the struct to contain all of the "heat maps"
+I created two functions. One for generating the room heat map and the other for generating the entire map heat map
+
+2-10: I added all of the initializations for the x, y, and cost with the pc being the first non-INT_MAX spot for the heap and algorithm
+
+2-13: My output was not printing the correct cost for each cell
+I added a measure to check if the cell had already been checked
+
+2-14: My room function is able to print a perfect integer depiction of the room heat map, but unable to convert to a char map for an unknown reason
+I added functionality to the whole map function, only changing the added weight and removing the hardness check when adding cost
+
+2-15:I fixed the casting to a char issue by realizing I can store the variables in an int array and then print only what I need with the
+other values being left out. Never changing the internals of the array.
+
+
