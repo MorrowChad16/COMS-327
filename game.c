@@ -6,6 +6,7 @@
 #include <endian.h>
 #include <limits.h>
 #include <unistd.h>
+#include <ncurses.h>
 
 #include "heap.h"
 
@@ -28,6 +29,7 @@
 #define NUM_MONSTERS 10
 #define MAX_MONSTERS 21
 #define min(x, y) (x < y ? x : y)
+#define MESSAGES 21
 
 //defines user actions when running game.c
 typedef enum action{
@@ -106,26 +108,24 @@ void generateDungeon(char dungeonArray[WINDOW_Y][WINDOW_X], int hardnessArray[GA
 	}
 }
 
-void generateRooms(int roomsArray[MAX_ROOMS][MAX_CONSTRAINTS], char dungeonArray[WINDOW_Y][WINDOW_X], int hardnessArray[GAME_HEIGHT][GAME_WIDTH], int *numRooms){
-	int totalArea = 0;
+void generateRooms(int roomsArray[MAX_ROOMS][MAX_CONSTRAINTS], char dungeon[WINDOW_Y][WINDOW_X], int hardnessArray[GAME_HEIGHT][GAME_WIDTH], int *numRooms){
 	int i, j;
 	int roomBuffer = *numRooms;
 	int loadingDungeon = FALSE;
 	if(*numRooms != 0){
 		loadingDungeon = TRUE;
 	}
-	
+
 	//Min: 4x by 3y
 	//OWN MAX: 14x by 14y
 	//103 is about 7% of a 78x19 area, which is the hard rock area available for placement
-	while((((*numRooms - roomBuffer) < *numRooms && loadingDungeon == TRUE) || ((*numRooms - roomBuffer) < 6 && loadingDungeon == FALSE))  && totalArea < 103){
+	while(((*numRooms - roomBuffer) < *numRooms && loadingDungeon == TRUE) || ((*numRooms - roomBuffer) < 6 && loadingDungeon == FALSE)){
 		if(loadingDungeon == FALSE){
 			roomsArray[*numRooms][X_LOC] = 1 + rand() % GAME_WIDTH - 2; //x-position
 			roomsArray[*numRooms][Y_LOC] = 1 + rand() % GAME_HEIGHT - 2; //y-position
 			roomsArray[*numRooms][X_LEN] = MIN_X_ROOM + (rand() % MAX_MINUS_MIN_X); //x-length
 			roomsArray[*numRooms][Y_LEN] = MIN_Y_ROOM + (rand() % MAX_MINUS_MIN_Y); //y-length
 		}
-		
 		/*
 		boolean int to check if room is occupied before placing it
 		0: NOT OCCUPIED
@@ -146,13 +146,13 @@ void generateRooms(int roomsArray[MAX_ROOMS][MAX_CONSTRAINTS], char dungeonArray
 				}
 			}
 		}
-				
+	
 		//pastes room in dungeon
 		if(isOccupied == FALSE){
 			for(i = 0; i < roomsArray[*numRooms - roomBuffer][Y_LEN]; i++){
 				for(j = 0; j < roomsArray[*numRooms - roomBuffer][X_LEN]; j++){
 					//Sets the cell value to '.' to represent a segment of the room
-					dungeonArray[roomsArray[*numRooms - roomBuffer][Y_LOC] + i][roomsArray[*numRooms - roomBuffer][X_LOC] + j] = '.';
+					dungeon[roomsArray[*numRooms - roomBuffer][Y_LOC] + i][roomsArray[*numRooms - roomBuffer][X_LOC] + j] = '.';
 					if(loadingDungeon == FALSE){
 						//Sets hardness to 0 for every cell within the room
 						hardnessArray[roomsArray[*numRooms - roomBuffer][Y_LOC] + i][roomsArray[*numRooms - roomBuffer][X_LOC] + j] = 0;
@@ -160,10 +160,8 @@ void generateRooms(int roomsArray[MAX_ROOMS][MAX_CONSTRAINTS], char dungeonArray
 				}
 			}
 		}
-		
 		if(isOccupied == FALSE && loadingDungeon == FALSE){
-			*numRooms = *numRooms + 1;
-			totalArea += (roomsArray[*numRooms][Y_LEN] * roomsArray[*numRooms][X_LEN]);
+			*numRooms += 1;
 		}
 		if(roomBuffer != 0){
 			roomBuffer--;
@@ -293,7 +291,7 @@ void generateStairs(char dungeon[WINDOW_Y][WINDOW_X], int hardnessArray[GAME_HEI
 	}
 }
 
-void printDungeon(char dungeon[WINDOW_Y][WINDOW_X]){ //, int hardnessArray[GAME_HEIGHT][GAME_WIDTH]
+void printDungeon(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH]){
 	int i, j;
 	//prints seed
 	int seed = rand();
@@ -306,11 +304,12 @@ void printDungeon(char dungeon[WINDOW_Y][WINDOW_X]){ //, int hardnessArray[GAME_
 		printf("\n");
 	}
 	
-	// for(i = 0; i < GAME_HEIGHT; i++){
-		// for(j = 0; j < GAME_WIDTH; j++){
-			// printf("%d\n", hardnessArray[10][j]);
-		// }
-	// }
+	for(i = 0; i < GAME_HEIGHT; i++){
+		for(j = 0; j < GAME_WIDTH; j++){
+			printf("%d", hardness[i][j] / 85);
+		}
+		printf("\n");
+	}
 }
 
 void loadDungeon(int hardness[GAME_HEIGHT][GAME_WIDTH], char *directory, int pc[2], int *number_of_rooms, int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], int *number_of_upstairs, int *number_of_downstairs, int rooms[MAX_ROOMS][MAX_CONSTRAINTS]){
@@ -791,126 +790,421 @@ void printWholeHeatMap(int wholeMap[GAME_HEIGHT][GAME_WIDTH], int pc[2]){
 	}
 }
 
-Character_t generateMonsters(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], 
-							int PC[2], char symbol){
-	/*
-	PC_t *PC; //tells us the character is a pc
-	NPC_t *NPC; //tells us the character is a pc
-	int s; //speed PC:10, MONST: 5-20
-	int i; //intelligence
-	int t; //telepathy
-	int tu; //tunneling ability
-	int e; //erratic
-	int pcLoc[2]; //last known pc-location for intelligent monsters
-	char c; //Symbol for the character
-	int a; //tells whether character is alive or not
-	int pos[2]; //position of character
-	int cn; //character number
-	int nt; //next turn value for priority queue
-	int sn; //sequence number for priority queue
-	heap_node_t *hn; //heap node for priority queue
-	char lv; //holds last value AKA value it is replacing while still
-	*/
-	Character_t character;
-	int randomX, randomY;
-	int monsterPlaced = FALSE;
+//Prints monsters and there relative location to the PC
+void printMonsters(Character_t monsters[MAX_MONSTERS], int *num_Mon){
+	int PC_LOC[2]; //Holds the PC location for comparison
+	char REL_LOC[*num_Mon][2]; //Holds relative location from the PC
+	char X_REL[5]; //Holds location to the PC X
+	char Y_REL[7]; //Holds location to the PC Y
+	char COMP_REL[*num_Mon][50];
+	int i, j;
 	
-	character.c = symbol;
-	character.a = TRUE;
+	int ableToScroll = FALSE;
+	if(*num_Mon > WINDOW_Y){
+		ableToScroll = TRUE;
+	}
 	
-	/*
-	PC is set not to move AT ALL
-	*/
-	if(character.c == '@'){
-		character.NPC = NULL;
-		character.a = TRUE;
-		character.pos[X_LOC] = PC[X_LOC];
-		character.pos[Y_LOC] = PC[Y_LOC];
-		character.s = 10;
-		character.nt = 0;
-		character.sn = 0;
+	PC_LOC[Y_LOC] = monsters[0].pos[Y_LOC];
+	PC_LOC[X_LOC] = monsters[0].pos[X_LOC];
+	
+	for(i = 1; i <= *num_Mon; i++){
+		REL_LOC[i][Y_LOC] = PC_LOC[Y_LOC] - monsters[i].pos[Y_LOC]; //Gets relative location from PC to the monster in the Y
+		REL_LOC[i][X_LOC] = PC_LOC[X_LOC] - monsters[i].pos[X_LOC]; //Gets relative location from PC to the monster in the X
+		
+		if(REL_LOC[i][Y_LOC] < 0){ //NORTH
+			strncpy(Y_REL, "north", 6);
+		} else{ //SOUTH
+			strncpy(Y_REL, "south", 6);
+		}
+		
+		if(REL_LOC[i][X_LOC] < 0){ //WEST
+			strncpy(X_REL, "west", 4);
+		} else{ //EAST
+			strncpy(X_REL, "east", 4);
+		}
+		
+		sprintf(COMP_REL[i - 1], "%c: %d %s and %d %s", monsters[i].c, abs(REL_LOC[i][Y_LOC]), Y_REL, abs(REL_LOC[i][X_LOC]), X_REL);
+	}
+	
+	//Secondary window for displaying monster
+	WINDOW *w;
+	w = newwin(24, 80, 0, 0);
+	int begin = 1;
+	int end = 0;
+	if(ableToScroll){
+		end = 24;
 	} else {
-		character.PC = NULL;
-		character.s = 5 + (rand() % 16);
-		character.i = rand() % 2;
-		character.t = rand() % 2;
-		character.tu = rand() % 2;
-		character.e = rand() % 2;
-		character.nt = 0;
+		end = *num_Mon;
 	}
-	
-	/*
-	Hexadecimal format of the characters characteristics
-	*/
-	if(character.i == FALSE && character.t == FALSE && character.tu == FALSE && character.e == FALSE){
-		character.c = '0';
-	} else if(character.i == TRUE && character.t == FALSE && character.tu == FALSE && character.e == FALSE){
-		character.c = '1';
-	} else if(character.i == FALSE && character.t == TRUE && character.tu == FALSE && character.e == FALSE){
-		character.c = '2';
-	} else if(character.i == TRUE && character.t == TRUE && character.tu == FALSE && character.e == FALSE){
-		character.c = '3';
-	} else if(character.i == FALSE && character.t == FALSE && character.tu == TRUE && character.e == FALSE){
-		character.c = '4';
-	} else if(character.i == TRUE && character.t == FALSE && character.tu == TRUE && character.e == FALSE){
-		character.c = '5';
-	} else if(character.i == FALSE && character.t == TRUE && character.tu == TRUE && character.e == FALSE){
-		character.c = '6';
-	} else if(character.i == TRUE && character.t == TRUE && character.tu == TRUE && character.e == FALSE){
-		character.c = '7';
-	} else if(character.i == FALSE && character.t == FALSE && character.tu == FALSE && character.e == TRUE){
-		character.c = '8';
-	} else if(character.i == TRUE && character.t == FALSE && character.tu == FALSE && character.e == TRUE){
-		character.c = '9';
-	} else if(character.i == FALSE && character.t == TRUE && character.tu == FALSE && character.e == TRUE){
-		character.c = 'a';
-	} else if(character.i == TRUE && character.t == TRUE && character.tu == FALSE && character.e == TRUE){
-		character.c = 'b';
-	} else if(character.i == FALSE && character.t == FALSE && character.tu == TRUE && character.e == TRUE){
-		character.c = 'c';
-	} else if(character.i == TRUE && character.t == FALSE && character.tu == TRUE && character.e == TRUE){
-		character.c = 'd';
-	} else if(character.i == FALSE && character.t == TRUE && character.tu == TRUE && character.e == TRUE){
-		character.c = 'e';
-	} else if(character.i == TRUE && character.t == TRUE && character.tu == TRUE && character.e == TRUE){
-		character.c = 'f';
+
+	RST:;
+	wrefresh(w);
+	clear();
+	if(*num_Mon == 1){
+		printw("You can see %d monster\n", *num_Mon);
+	} else {
+		printw("You can see %d monsters\n", *num_Mon);
 	}
-	
-	/*
-	Monster is placed randomly INSIDE one of the open spaces
-	*/
-	if(character.c != '@'){
-		while(!monsterPlaced){
-			randomY = 1 + rand() % GAME_HEIGHT - 1;
-			randomX = 1 + rand() % GAME_WIDTH - 2;
-			if(!hardness[randomY][randomX] && (dungeon[randomY][randomX] == '.' || dungeon[randomY][randomX] == '#')){	
-				character.lv = dungeon[randomY][randomX];
-				dungeon[randomY][randomX] = character.c;
-				character.pos[0] = randomX;
-				character.pos[1] = randomY;
-				monsterPlaced = TRUE;
+	for(i = begin; i <= end; i++){
+		printw("%s\n", COMP_REL[i - 1]);
+	}
+
+	int com;
+	com = getch();
+	switch(com){
+		case KEY_DOWN: //Scroll down monster list
+			if(!ableToScroll){
+				goto RST;
+			} else if(end + 1 <= *num_Mon){ //if there is more at the end of the list then scroll down to view it. 
+				begin++;
+				end++;
+			} else {
+				mvprintw(10, 40, "No more monsters to view below!");
 			}
+			
+			goto RST;
+			break;
+		case KEY_UP: //Scroll up monster list
+			if(!ableToScroll){
+				goto RST;
+			} else if(begin - 1 >= 0){ //if there is more at the beginning of the list then scroll up to view it. 
+				begin--;
+				end--;
+			} else {
+				mvprintw(10, 40, "No more monsters to view above!");
+			}
+
+			goto RST;
+			break;
+		case 27: //quit viewing monster list
+			break;
+		default: //print commands
+			mvprintw(10, 40, "COMMANDS:\n<UP ARROW>: Scroll up list\n<DOWN ARROW>: Scroll down list\n<ESC>: Return to game\n");
+			goto RST;
+	}
+	delwin(w);
+}
+
+//function deletes a monster and updates the characters array
+int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_MONSTERS], int newXpos, int newYpos, int *num_Mon){
+	int i, j;
+	//skip 0: PC location
+	for(i = 0; i < MAX_MONSTERS; i++){ //loops through all our characters
+		if(newYpos == characters[i].pos[Y_LOC] && newXpos == characters[i].pos[X_LOC] && characters[i].a){ //checks if the new position is occupied by a monster
+			dungeon[newYpos][newXpos] = characters[i].lv; //Replace the pos with the dungeon char
+			characters[i].a = FALSE;
+			*num_Mon -= 1;
+			return 1;
 		}
 	}
-	return character;
+	return 0;
+}
+
+void generateNewFloor(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GAME_WIDTH], 
+						int wholeMap[GAME_HEIGHT][GAME_WIDTH], int PC[2], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], 
+						int *number_of_upstairs, int *number_of_downstairs, int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms,						
+						int generatingNewDung, int *numMon, Character_t characters[MAX_MONSTERS]){
+	int i;
+	if(generatingNewDung){
+	    *number_of_rooms = 0;
+		*number_of_downstairs = 0;
+		*number_of_upstairs = 0;
+		hardness[0][0] = 0;
+		*numMon = 1 + rand() % 19;
+	}
+	generateDungeon(dungeon, hardness);
+	generateRooms(rooms, dungeon, hardness, number_of_rooms);
+	generateCorridors(dungeon, rooms, number_of_rooms, hardness, number_of_upstairs);
+	generateStairs(dungeon, hardness, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, PC);
+	//creates new heat maps if the PC has been initiated
+	if(!generatingNewDung){
+		roomHeatMapGenerator(PC, roomMap, hardness);
+		//printRoomHeatMap(roomMap, PC);
+		wholeHeatMapGenerator(PC, wholeMap, hardness);
+		//printWholeHeatMap(wholeMap, PC);
+	}
+}
+
+//function to control the PC movement from the User
+void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GAME_WIDTH], 
+						int wholeMap[GAME_HEIGHT][GAME_WIDTH], int PC[2], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], 
+						int *number_of_upstairs, int *number_of_downstairs, int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms, int *gameStatus){
+	int row, col, i;
+	int errorMessage = -1;
+	int key;
+	
+	if(errorMessage == 3){
+		CMD:;
+		clear();
+		mvprintw(0, 0, "Commands:\n<7 or y>: Move PC Up-Left\n<8 or k>: Move PC Up\n<9 or u>: Move PC Up-Right\n<6 or l>: Move PC Right\n<3 or n>: Move PC Down-Right\n<2 or j>: Move PC Down\n<1 or b>: Move PC Down-Left\n<4 or h>: Move PC Left\n<'>'>: Go Down Stairs\n<'<'>: Go Up Stairs\n<5 or space or .>: Rest PC\n<m>: Display Monsters\n<Q>: Quit\n\nPress any key to exit");
+		key = getch();
+		switch(key){
+			default:
+				goto DFT;
+				break;
+		}
+	}
+	
+	DFT:;
+	refresh();
+	clear();
+	for(col = 0; col < GAME_HEIGHT; col++){
+		for(row = 0; row < GAME_WIDTH; row++){
+			mvaddch(col, row, dungeon[col][row]);
+		}
+	}
+
+	ER:;
+	
+	if(errorMessage == 0){
+		mvprintw(MESSAGES, 0, "YOU ARE RUNNING INTO A WALL! GO IN A NEW DIRECTION!\n");
+	} else if(errorMessage == 1){
+		mvprintw(MESSAGES, 0, "YOU ARE NOT ON A DOWN STAIR CASE!\n");
+	} else if(errorMessage == 2){
+		mvprintw(MESSAGES, 0, "YOU ARE NOT ON AN UP STAIR CASE!\n");
+	}
+	
+	key = getch();
+	switch(key) {
+		case 'y': //UP-LEFT
+			Y:;
+			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] - 1, characters[0].pos[Y_LOC] - 1, num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[Y_LOC] -= 1; //Update Y
+				characters[0].pos[X_LOC] -= 1; //Update X
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+			} else {
+				errorMessage = 0;
+				goto ER;
+			}
+			break;
+		case '7': //UP-LEFT
+			goto Y; //Goes to default UP-LEFT case
+			break;
+		case KEY_HOME: //UP-LEFT
+			goto Y; //Goes to default UP-LEFT case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case 'k': //UP
+			K:;
+			
+			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC]]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], characters[0].pos[Y_LOC] - 1, num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[Y_LOC] -= 1; //Update Y
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+			} else {
+				errorMessage = 0;
+				goto ER;
+			}
+			break;
+		case '8': //UP
+			goto K; //Goes to default UP case
+			break;
+		case KEY_UP: //UP
+			goto K; //Goes to default UP case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case 'u': //UP-RIGHT
+			U:;
+			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] + 1, characters[0].pos[Y_LOC] - 1, num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[Y_LOC] -= 1; //Update Y
+				characters[0].pos[X_LOC] += 1; //Update X
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+			} else {
+				errorMessage = 0;
+				goto ER;
+			}
+			break;
+		case '9': //UP-RIGHT
+			goto U; //Goes to default UP-RIGHT case
+			break;
+		case KEY_PPAGE: //UP-RIGHT
+			goto U; //Goes to default UP-RIGHT case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case 'l': //RIGHT
+			L:;
+			if(!hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] + 1, characters[0].pos[Y_LOC], num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[X_LOC] += 1; //Update X
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+
+			} else {
+				errorMessage = 0;
+				goto ER;
+				
+			}
+			break;
+		case '6': //RIGHT
+			goto L; //Goes to default RIGHT case
+			break;
+		case KEY_RIGHT: //RIGHT
+			goto L; //Goes to default RIGHT case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case 'n': //DOWN-RIGHT
+			N:;
+			
+			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] + 1, characters[0].pos[Y_LOC] + 1, num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[Y_LOC] += 1; //Update Y
+				characters[0].pos[X_LOC] += 1; //Update X
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+			} else {
+				errorMessage = 0;
+				goto ER;
+			}
+			break;
+		case '3': //DOWN-RIGHT
+			goto N; //Goes to default DOWN-RIGHT case
+			break;
+		case KEY_NPAGE: //DOWN-RIGHT
+			goto N; //Goes to default DOWN-RIGHT case 
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case 'j': //DOWN
+			J:;
+			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC]]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], characters[0].pos[Y_LOC] + 1, num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[Y_LOC] += 1; //Update Y
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+			} else {
+				errorMessage = 0;
+				goto ER;
+			}
+			break;
+		case '2': //DOWN
+			goto J; //Goes to default DOWN case
+			break;
+		case KEY_DOWN: //DOWN
+			goto J; //Goes to default DOWN case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case 'b': //DOWN-LEFT
+			B:;
+			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] - 1, characters[0].pos[Y_LOC] + 1, num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[Y_LOC] += 1; //Update Y
+				characters[0].pos[X_LOC] -= 1; //Update X
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+			} else {
+				errorMessage = 0;
+				goto ER;
+			}
+			break;
+		case '1': //DOWN-LEFT
+			goto B; //Goes to default DOWN-LEFT case
+			break;
+		case KEY_END: //DOWN-LEFT
+			goto B; //Goes to default DOWN-LEFT case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case 'h': //LEFT
+			H:;
+			if(!hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
+				//Checks if space is occupied by a monster
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] - 1, characters[0].pos[Y_LOC], num_Mon);
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
+				characters[0].pos[X_LOC] -= 1; //Update X
+				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
+				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
+			} else {
+				errorMessage = 0;
+				goto ER;
+			}
+			break;
+		case '4': //LEFT
+			goto H; //Goes to default LEFT case
+			break;
+		case KEY_LEFT: //LEFT
+			goto H; //Goes to default LEFT case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case '.': //REST
+			R:;
+			//PC doesn't do anything
+			break;
+		case ' ': //REST
+			goto R; //Goes to default REST case
+			break;
+		case '5': //REST
+			goto R; //Goes to default REST case
+			break;
+		case KEY_B2: //REST
+			goto R; //Goes to default REST case
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------	
+		case '>': //attempts to go downstairs
+			if(characters[0].lv == '>'){
+				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, rooms, number_of_rooms, 1, num_Mon, characters);
+				*gameStatus = 2;
+			} else {
+				errorMessage = 1;
+				goto ER;
+			}
+			break;
+		case '<': //attempts to go upstairs
+			if(characters[0].lv == '<'){
+				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, rooms, number_of_rooms, 1, num_Mon, characters);
+				*gameStatus = 2;
+			} else {
+				errorMessage = 2;
+				goto ER;
+			}
+			break;
+		case 'm': //Print Monsters
+			printMonsters(characters, num_Mon);
+			goto DFT;
+			break;
+		case 'Q': //Quit game
+			*gameStatus = 1;
+			break;
+		default:
+			errorMessage = 3;
+			goto CMD;
+			break;
+	}
+	refresh();
 }
 
 void inSight(char dungeon[WINDOW_Y][WINDOW_X], Character_t *character, int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms, int PC[2]){
 	int inSight = FALSE;
+	int pcInRoom = FALSE;
 	int	i, j;
 	
-	if(!character->t){ //skip this if the character is telepathic
+	if(!character->t || character->c == '@'){ //skip this if the character is telepathic
 		/*
 		Checks if PC is in the same room as the monster. In which case the monster, telepathic or not, will have the PC's last location
 		*/
-		if(character->c != '@'){
-			for(i = 0; i < *number_of_rooms; i++){
-				if((PC[X_LOC] >= rooms[i][X_LOC] && PC[Y_LOC] >= rooms[i][Y_LOC]) && 
-					(PC[X_LOC] <= (rooms[i][X_LOC] + rooms[i][X_LEN]) && PC[Y_LOC] <= (rooms[i][Y_LOC] + rooms[i][Y_LEN]))){
-					if((character->pos[X_LOC] >= rooms[i][X_LOC] && character->pos[Y_LOC] >= rooms[i][Y_LOC]) && 
-						(character->pos[X_LOC] <= (rooms[i][X_LOC] + rooms[i][X_LEN]) && character->pos[Y_LOC] <= (rooms[i][Y_LOC] + rooms[i][Y_LEN]))){
-						inSight = TRUE;
-					}
+		for(i = 0; i < *number_of_rooms; i++){
+			if((PC[X_LOC] >= rooms[i][X_LOC] && PC[Y_LOC] >= rooms[i][Y_LOC]) && 
+				(PC[X_LOC] <= (rooms[i][X_LOC] + rooms[i][X_LEN]) && PC[Y_LOC] <= (rooms[i][Y_LOC] + rooms[i][Y_LEN]))){
+					pcInRoom = TRUE;
+				if((character->pos[X_LOC] >= rooms[i][X_LOC] && character->pos[Y_LOC] >= rooms[i][Y_LOC]) && 
+					(character->pos[X_LOC] <= (rooms[i][X_LOC] + rooms[i][X_LEN]) && character->pos[Y_LOC] <= (rooms[i][Y_LOC] + rooms[i][Y_LEN]))){
+					inSight = TRUE;
 				}
 			}
 		}
@@ -927,23 +1221,100 @@ void inSight(char dungeon[WINDOW_Y][WINDOW_X], Character_t *character, int rooms
 		character->pcLoc[X_LOC] = 0;
 		character->pcLoc[Y_LOC] = 0;
 	}
+	
+	if(pcInRoom && character->c == '@'){
+		character->lv = '.';
+	} else if(character->c == '@'){
+		character->lv = '#';
+	}
 }
 
-//function deletes a monster and updates the characters array
-int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t *characters[MAX_MONSTERS], int newXpos, int newYpos, int *num_Mon){
-	int i, j;
-	//skip 0: PC location
-	for(i = 1; i < *num_Mon + 1; i++){ //loops through all our characters
-		if(newYpos == characters[i]->pos[Y_LOC] && newXpos == characters[i]->pos[X_LOC]){ //checks if the new position is occupied by a monster
-			dungeon[newYpos][newXpos] = characters[i]->lv; //Replace the pos with the dungeon char
-			for(j = i; j < *num_Mon; j++){ //overwrite the deleted monster with the succeeding monsters
-				characters[j] = characters[j + 1];
+void generateMonsters(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int PC[2], 
+					int *num_Mon, Character_t characters[MAX_MONSTERS], int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms){
+	int i = 0;
+	while(i <= *num_Mon){ //generate all the monsters and their characteristics
+		int randomX, randomY;
+		int monsterPlaced = FALSE;
+		
+		characters[i].sn = i;
+		characters[i].a = TRUE;
+		/*
+		PC is set not to move AT ALL
+		*/
+		if(i == 0){
+			characters[0].c = '@';
+			characters[0].NPC = NULL;
+			characters[0].pos[X_LOC] = PC[X_LOC];
+			characters[0].pos[Y_LOC] = PC[Y_LOC];
+			characters[0].s = 10;
+			characters[0].nt = 0;
+			characters[0].sn = 0;
+		} else {
+			characters[i].PC = NULL;
+			characters[i].s = 5 + (rand() % 16);
+			characters[i].i = rand() % 2;
+			characters[i].t = rand() % 2;
+			characters[i].tu = rand() % 2;
+			characters[i].e = rand() % 2;
+			characters[i].nt = 0;
+			
+			if(i != 0){
+				/*
+				Hexadecimal format of the characters characteristics
+				*/
+				if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == FALSE){
+					characters[i].c = '0';
+				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == FALSE){
+					characters[i].c = '1';
+				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == FALSE){
+					characters[i].c = '2';
+				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == FALSE){
+					characters[i].c = '3';
+				} else if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == FALSE){
+					characters[i].c = '4';
+				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == FALSE){
+					characters[i].c = '5';
+				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == FALSE){
+					characters[i].c = '6';
+				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == FALSE){
+					characters[i].c = '7';
+				} else if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == TRUE){
+					characters[i].c = '8';
+				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == TRUE){
+					characters[i].c = '9';
+				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == TRUE){
+					characters[i].c = 'a';
+				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == TRUE){
+					characters[i].c = 'b';
+				} else if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == TRUE){
+					characters[i].c = 'c';
+				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == TRUE){
+					characters[i].c = 'd';
+				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == TRUE){
+					characters[i].c = 'e';
+				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == TRUE){
+					characters[i].c = 'f';
+				}
 			}
-			*num_Mon -= 1; //Essentially deletes the monster
-			return 1;
+			
+			/*
+			Monster is placed randomly INSIDE one of the open spaces
+			*/
+			while(!monsterPlaced){
+				randomY = 1 + rand() % GAME_HEIGHT - 1;
+				randomX = 1 + rand() % GAME_WIDTH - 2;
+				if(!hardness[randomY][randomX] && (dungeon[randomY][randomX] == '.' || dungeon[randomY][randomX] == '#')){	
+					characters[i].lv = dungeon[randomY][randomX];
+					dungeon[randomY][randomX] = characters[i].c;
+					characters[i].pos[0] = randomX;
+					characters[i].pos[1] = randomY;
+					monsterPlaced = TRUE;
+				}
+			}
+			inSight(dungeon, characters, rooms, number_of_rooms, PC); //check if the monster can see the PC OR PC is in a room
 		}
+		i++;
 	}
-	return 0;
 }
 
 void scanWall(int wholeMap[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GAME_WIDTH], int direction, Character_t *p, int move[2]){
@@ -952,6 +1323,7 @@ void scanWall(int wholeMap[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GA
 	int scanX[3];
 	int scanY[3];
 	int i, moveXdir, moveYdir;
+	
 	/*
 	1: RIGHT
 	2: BOTTOM RIGHT
@@ -962,7 +1334,6 @@ void scanWall(int wholeMap[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GA
 	7. TOP
 	8. TOP RIGHT
 	*/
-	
 	if(direction == 1){ //RIGHT
 		for(i = 0; i < 3; i++){
 			scanX[i] = totalScanX[i];
@@ -1003,7 +1374,7 @@ void scanWall(int wholeMap[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GA
 				scanY[i] = totalScanY[0];
 			}
 		}
-	} else { //TOP LEFT CORNER //UPDATE!!!
+	} else { //TOP LEFT CORNER
 		int buffer = 1;
 		for(i = 0; i < 3; i++){
 			if((i + 7) < 8){
@@ -1066,9 +1437,9 @@ static int32_t compare_characters(const void *c1, const void *c2) {
 }
 
 //simulates the game with the given monster characteristics
-void simulateGame(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], 
-					int PC[2], Character_t **characters, int roomMap[GAME_HEIGHT][GAME_WIDTH],
-					int wholeMap[GAME_HEIGHT][GAME_WIDTH], int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *num_Mon){
+void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GAME_WIDTH], 
+						int wholeMap[GAME_HEIGHT][GAME_WIDTH], int PC[2], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], 
+						int *number_of_upstairs, int *number_of_downstairs, int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms){
 	heap_t h;
 	heap_init(&h, compare_characters, NULL);
 	static Character_t *p;
@@ -1076,166 +1447,249 @@ void simulateGame(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GA
 	int moveXdir = 0;
 	int moveYdir = 0;
 	int isErratic = FALSE;
+	int gameStatus = 0;
+	
+	generateMonsters(dungeon, hardness, PC, num_Mon, characters, rooms, number_of_rooms); //generate the PC and the monsters
+	
 	int inSight = FALSE;
 	
 	//Insert all the initial characters
 	for(i = 0; i <= *num_Mon; i++){
-		characters[i]->hn = heap_insert(&h, &characters[i]);
+		characters[i].hn = heap_insert(&h, &characters[i]);
 	}
 	
-	// // //While the PC is alive, move monsters
-	// while(characters[0]->a){ //pull the next moving monster to move him
-		// p = heap_remove_min(&h); 
-		// // //PRINTS INFO FOR EVERY MONSTER INFO
-		// // printf("NAME: %c\n", p->c);
-		// // printf("SPEED: %d\n", p->s);
-		// // printf("INTELLIGENCE: %d\n", p->i);
-		// // printf("TELEPATHY: %d\n", p->t);
-		// // printf("TUNNELLING: %d\n", p->tu);
-		// // printf("ERRATIC: %d\n", p->e);
-		// // printf("PC LOC: %d %d\n", p->pcLoc[Y_LOC], p->pcLoc[X_LOC]);
-		// // printf("ALIVE: %d\n", p->a);
-		// // printf("LOCATION: %d %d\n", p->pos[Y_LOC], p->pos[X_LOC]);
-		// // printf("OLD CHAR: %c\n", p->lv);
-		// // printf("----------------------------------------\n");
-		// p->hn = NULL;
-		// int i, moveTo[2];
-						
-		// //If the node pulled out is the PC then print the updated dungeon and pause
-		// if(p->c == '@'){
-			// printDungeon(dungeon);
-			// usleep(250000);
-		// } else {
-			// if(p->pcLoc[X_LOC] && p->pcLoc[Y_LOC]){
-				// inSight = TRUE;
-			// }
+	//While the PC is alive, move monsters
+	while(characters[0].a && gameStatus == 0){
+		p = heap_remove_min(&h); //pull the next moving monster to move him
+		if(p->a){
+			p->hn = NULL;
+			int i, moveTo[2];
+							
+			//If the node pulled out is the PC then print the updated dungeon and pause
+			if(p->c == '@'){
+				//Runs commands for moving the PC
+				User_Input(characters, num_Mon, dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, rooms, number_of_rooms, &gameStatus);
+				if(!*num_Mon){
+					gameStatus = 3;
+				}
+				if(gameStatus == 2){
+					for(i = 0; i < MAX_MONSTERS; i++){
+						heap_remove_min(&h); //remove all of the old monsters from the heap
+					}
+					generateMonsters(dungeon, hardness, PC, num_Mon, characters, rooms, number_of_rooms); //generate the new monsters
+					//Insert all the new characters
+					for(i = 0; i <= *num_Mon; i++){
+						characters[i].hn = heap_insert(&h, &characters[i]);
+					}
+					gameStatus = 0; //sets game back to normal running mode
+				}
+				//Updates heat maps after every PC move, no matter if it stands still. Should change later but simple solution
+				roomHeatMapGenerator(PC, roomMap, hardness);
+				wholeHeatMapGenerator(PC, wholeMap, hardness);
+			} else {
+				if(p->pcLoc[X_LOC] && p->pcLoc[Y_LOC]){
+					inSight = TRUE;
+				}
+				
+				if(p->e){
+					//If the character is erratic then this will determine whether it acts erratic on the next step
+					isErratic = rand() % 2; //0: normal behavior, 1: erratic behavior
+				}
+				
+				/*
+				1: RIGHT
+				2: BOTTOM RIGHT
+				3. BOTTOM
+				4. BOTTOM LEFT
+				5. LEFT
+				6. TOP LEFT
+				7. TOP
+				8. TOP RIGHT
+				*/
+				if(!isErratic){
+					if(p->i && inSight){ //intelligent monster and telepathic or can see the PC
+						if(characters[0].pos[X_LOC] > p->pos[X_LOC]){ //PC is to the right of the monster
+							if(characters[0].pos[Y_LOC] > p->pos[Y_LOC]){ //DOWN-RIGHT
+								scanWall(wholeMap, roomMap, 2, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							} else if (characters[0].pos[Y_LOC] < p->pos[Y_LOC]) { //UP-RIGHT
+								scanWall(wholeMap, roomMap, 8, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							} else { //PC is only to the right of the monster so scan the right "wall" of vertices
+								scanWall(wholeMap, roomMap, 1, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							}
+						} else if (characters[0].pos[X_LOC] < p->pos[X_LOC]) { //PC is to the left of the monster
+							if(characters[0].pos[Y_LOC] > p->pos[Y_LOC]){ //DOWN-LEFT
+								scanWall(wholeMap, roomMap, 4, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							} else if (characters[0].pos[Y_LOC] < p->pos[Y_LOC]) { //UP-LEFT
+								scanWall(wholeMap, roomMap, 6, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							} else { //PC is only to the left of the monster so scan the left "wall" of vertices
+								scanWall(wholeMap, roomMap, 5, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							}
+						} else { //Not intelligent
+							if(characters[0].pos[Y_LOC] > p->pos[Y_LOC]){ //PC is directly below the monster
+								scanWall(wholeMap, roomMap, 3, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							} else { //PC is directly above the monster
+								scanWall(wholeMap, roomMap, 7, p, moveTo);
+								moveXdir = moveTo[X_LOC];
+								moveYdir = moveTo[Y_LOC];
+							}
+						}
+					} else { //not intelligent or can't see the PC
+						//default if the monster knows where the PC is but doens't have any special abilities
+						if(inSight){
+							//calculate the X move direction to the PC
+							if(abs(p->pcLoc[X_LOC] - p->pos[X_LOC])){
+								moveXdir = ((p->pcLoc[X_LOC] - p->pos[X_LOC]) / (abs(p->pcLoc[X_LOC] - p->pos[X_LOC])));
+							}
+							//calculate the Y move direction to the PC
+							if(abs(p->pcLoc[Y_LOC] - p->pos[Y_LOC])){
+								moveYdir = ((p->pcLoc[Y_LOC] - p->pos[Y_LOC]) / (abs(p->pcLoc[Y_LOC] - p->pos[Y_LOC])));
+							}	
+						}  else { //default erratic behavior for non-intelligent monsters. Intelligent monsters stay still, preserving "energy"
+							if(!p->i){
+								moveXdir = (rand() % 3) - 1;
+								moveYdir = (rand() % 3) - 1;
+							}	
+						}
+					}
+				} else { //Erratic behavior
+					moveXdir = (rand() % 3) - 1;
+					moveYdir = (rand() % 3) - 1;
+				}
+				
+				//Move the monster if the random new space is different from itself
+				//and the new location is an open area
+				//or it can tunnel through rock
+				//Can move to any of the 8 surrounding cells
+				if((moveYdir || moveXdir) && ((p->tu && hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] < 255) || !hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir])){
+					//Checks if the new space is a monster
+					//if the monster was deleted then don't do anything
+					deleteMonster(dungeon, characters, p->pos[X_LOC] + moveXdir, p->pos[Y_LOC] + moveYdir, num_Mon);
+					//if the new location is an open room, corridor or staircase then update stats
+					if(hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] == 0){ 
+						dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->lv; //replace monster with old room or corridor char
+						p->pos[X_LOC] += moveXdir; //update monster x location
+						p->pos[Y_LOC] += moveYdir; //update monster y location
+						p->lv = dungeon[p->pos[Y_LOC]][p->pos[X_LOC]];
+						dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->c; //replace dungeon character with new monster character
+						if((p->pos[Y_LOC] == p->pcLoc[Y_LOC]) && (p->pos[X_LOC] == p->pcLoc[X_LOC])){ //Monster is in pc last seen position but it isn't there
+							p->pcLoc[X_LOC] = 0; //remove x pc location
+							p->pcLoc[Y_LOC] = 0; //remove y pc location
+						}
+					} else if(p->tu && hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir]){ //monster can tunnel so it starts "smashing" the wall
+						hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] = hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] - 85; //update hardness
+						if(hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] <= 0){ //mutable rock has been broken open so monster can go there
+							dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->lv; //replace monster with old room or corridor char
+							p->lv = '#';
+							p->pos[X_LOC] += moveXdir; //update monster x location
+							p->pos[Y_LOC] += moveYdir; //update monster y location
+							dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->c; //replace dungeon character with new monster character
+							hardness[p->pos[Y_LOC]][p->pos[X_LOC]] = 0;
+							//Update heat maps
+							roomHeatMapGenerator(PC, roomMap, hardness);
+							wholeHeatMapGenerator(PC, wholeMap, hardness);
+						} //mutable rock still hasn't broken so do nothing
+					} 
+				}
+			}
 			
-			// if(p->e){
-				// //If the character is erratic then this will determine whether it acts erratic on the next step
-				// isErratic = rand() % 2; //0: normal behavior, 1: erratic behavior
-			// }
-			
-			// /*
-			// 1: RIGHT
-			// 2: BOTTOM RIGHT
-			// 3. BOTTOM
-			// 4. BOTTOM LEFT
-			// 5. LEFT
-			// 6. TOP LEFT
-			// 7. TOP
-			// 8. TOP RIGHT
-			// */
-			// if(!isErratic){
-				// if(p->i && inSight){ //intelligent monster and telepathic or can see the PC
-					// if(characters[0]->pos[X_LOC] > p->pos[X_LOC]){ //PC is to the right of the monster
-						// if(characters[0]->pos[Y_LOC] > p->pos[Y_LOC]){ //DOWN-RIGHT
-							// scanWall(wholeMap, roomMap, 2, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// } else if (characters[0]->pos[Y_LOC] < p->pos[Y_LOC]) { //UP-RIGHT
-							// scanWall(wholeMap, roomMap, 8, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// } else { //PC is only to the right of the monster so scan the right "wall" of vertices
-							// scanWall(wholeMap, roomMap, 1, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// }
-					// } else if (characters[0]->pos[X_LOC] < p->pos[X_LOC]) { //PC is to the left of the monster
-						// if(characters[0]->pos[Y_LOC] > p->pos[Y_LOC]){ //DOWN-LEFT
-							// scanWall(wholeMap, roomMap, 4, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// } else if (characters[0]->pos[Y_LOC] < p->pos[Y_LOC]) { //UP-LEFT
-							// scanWall(wholeMap, roomMap, 6, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// } else { //PC is only to the left of the monster so scan the left "wall" of vertices
-							// scanWall(wholeMap, roomMap, 5, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// }
-					// } else { //Not intelligent
-						// if(characters[0]->pos[Y_LOC] > p->pos[Y_LOC]){ //PC is directly below the monster
-							// scanWall(wholeMap, roomMap, 3, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// } else { //PC is directly above the monster
-							// scanWall(wholeMap, roomMap, 7, p, moveTo);
-							// moveXdir = moveTo[X_LOC];
-							// moveYdir = moveTo[Y_LOC];
-						// }
-					// }
-				// } else { //not intelligent or can't see the PC
-					// //default if the monster knows where the PC is but doens't have any special abilities
-					// if(inSight){
-						// //calculate the X move direction to the PC
-						// if(abs(p->pcLoc[X_LOC] - p->pos[X_LOC])){
-							// moveXdir = ((p->pcLoc[X_LOC] - p->pos[X_LOC]) / (abs(p->pcLoc[X_LOC] - p->pos[X_LOC])));
-						// }
-						// //calculate the Y move direction to the PC
-						// if(abs(p->pcLoc[Y_LOC] - p->pos[Y_LOC])){
-							// moveYdir = ((p->pcLoc[Y_LOC] - p->pos[Y_LOC]) / (abs(p->pcLoc[Y_LOC] - p->pos[Y_LOC])));
-						// }	
-					// }  else { //default erratic behavior for non-intelligent monsters. Intelligent monsters stay still, preserving "energy"
-						// if(!p->i){
-							// moveXdir = (rand() % 3) - 1;
-							// moveYdir = (rand() % 3) - 1;
-						// }	
-					// }
-				// }
-			// } else { //Erratic behavior
-				// moveXdir = (rand() % 3) - 1;
-				// moveYdir = (rand() % 3) - 1;
-			// }
-			
-			// //Move the monster if the random new space is different from itself
-			// //and the new location is an open area
-			// //or it can tunnel through rock
-			// //Can move to any of the 8 surrounding cells
-			// if((moveYdir || moveXdir) && ((p->tu && hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] < 255) || !hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir]) 
-				// && dungeon[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] != '@'){
-				// //Checks if the new space is a monster
-				// // int didDeleteMonst = deleteMonster(dungeon, characters, p->pos[X_LOC] + moveXdir, p->pos[Y_LOC] + moveYdir, num_Mon);
-				// //if the monster was deleted then don't do anything
-				// if(!deleteMonster(dungeon, characters, p->pos[X_LOC] + moveXdir, p->pos[Y_LOC] + moveYdir, num_Mon)){
-					// //if the new location is an open room, corridor or staircase then update stats
-					// if(hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] == 0){ 
-						// dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->lv; //replace monster with old room or corridor char
-						// p->pos[X_LOC] = p->pos[X_LOC] + moveXdir; //update monster x location
-						// p->pos[Y_LOC] = p->pos[Y_LOC] + moveYdir; //update monster y location
-						// p->lv = dungeon[p->pos[Y_LOC]][p->pos[X_LOC]];
-						// dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->c; //replace dungeon character with new monster character
-						// if((p->pos[Y_LOC] == p->pcLoc[Y_LOC]) && (p->pos[X_LOC] == p->pcLoc[X_LOC])){ //Monster is in pc last seen position but it isn't there
-							// p->pcLoc[X_LOC] = 0; //remove x pc location
-							// p->pcLoc[Y_LOC] = 0; //remove y pc location
-						// }
-					// } else if(p->tu && hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir]){ //monster can tunnel so it starts "smashing" the wall
-						// hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] = hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] - 85; //update hardness
-						// if(hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] <= 0){ //mutable rock has been broken open so monster can go there
-							// dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->lv; //replace monster with old room or corridor char
-							// p->lv = '#';
-							// p->pos[X_LOC] = p->pos[X_LOC] + moveXdir; //update monster x location
-							// p->pos[Y_LOC] = p->pos[Y_LOC] + moveYdir; //update monster y location
-							// dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->c; //replace dungeon character with new monster character
-							// //Update heat maps
-							// roomHeatMapGenerator(PC, roomMap, hardness);
-							// wholeHeatMapGenerator(PC, wholeMap, hardness);
-						// } //mutable rock still hasn't broken so do nothing
-					// } 
-				// }
-			// } else if (dungeon[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] == '@'){ //found the pc and killed him
-				// characters[0]->a = FALSE;
-			// }
-		// }
-		
-		// p->nt = p->nt + 1000/p->s;
-		// heap_insert(&h, p);
-	// }
+			p->nt = p->nt + 1000/p->s;
+			heap_insert(&h, p);
+		}
+	}
 	
-	printf("YOU LOSE!\n");
+	endwin();
+	if(gameStatus == 0){
+	const char *tombstone =
+	  "\n\n\n\n                /\"\"\"\"\"/\"\"\"\"\"\"\".\n"
+	  "               /     /         \\             __\n"
+	  "              /     /           \\            ||\n"
+	  "             /____ /   Rest in   \\           ||\n"
+	  "            |     |    Pieces     |          ||\n"
+	  "            |     |               |          ||\n"
+	  "            |     |   A. Luser    |          ||\n"
+	  "            |     |               |          ||\n"
+	  "            |     |     * *   * * |         _||_\n"
+	  "            |     |     *\\/* *\\/* |        | TT |\n"
+	  "            |     |     *_\\_  /   ...\"\"\"\"\"\"| |"
+	  "| |.\"\"....\"\"\"\"\"\"\"\".\"\"\n"
+	  "            |     |         \\/..\"\"\"\"\"...\"\"\""
+	  "\\ || /.\"\"\".......\"\"\"\"...\n"
+	  "            |     |....\"\"\"\"\"\"\"........\"\"\"\"\""
+	  "\"^^^^\".......\"\"\"\"\"\"\"\"..\"\n"
+	  "            |......\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"......"
+	  "..\"\"\"\"\"....\"\"\"\"\"..\"\"...\"\"\".\n\n"
+	  "            You're dead.  Better luck in the next life.\n\n\n";
+	  printf("%s\n", tombstone);
+	} else if(gameStatus == 1) {
+			char *quit = 
+		" /$$     /$$                         /$$$$$$            /$$   /$$    /$$\n"
+		"|  $$   /$$/                        /$$__  $$          |__/  | $$   | $$\n"
+		" \\  $$ /$$//$$$$$$  /$$   /$$      | $$  \\ $$ /$$   /$$ /$$ /$$$$$$ | $$\n"
+		"  \\  $$$$//$$__  $$| $$  | $$      | $$  | $$| $$  | $$| $$|_  $$_/ | $$\n"
+		"   \\  $$/| $$  \\ $$| $$  | $$      | $$  | $$| $$  | $$| $$  | $$   |__/\n"
+		"    | $$ | $$  | $$| $$  | $$      | $$/$$ $$| $$  | $$| $$  | $$ /$$   \n"
+		"    | $$ |  $$$$$$/|  $$$$$$/      |  $$$$$$/|  $$$$$$/| $$  |  $$$$//$$\n"
+		"    |__/  \\______/  \\______/        \\____ $$$ \\______/ |__/   \\___/ |__/\n"
+		"                                         \\__/                           \n"
+		"                                                                        \n"
+		"                                                                        \n";
+		printf("%s\n", quit);
+	} else {
+				const char *victory =
+	  "\n                                       o\n"
+	  "                                      $\"\"$o\n"
+	  "                                     $\"  $$\n"
+	  "                                      $$$$\n"
+	  "                                      o \"$o\n"
+	  "                                     o\"  \"$\n"
+	  "                oo\"$$$\"  oo$\"$ooo   o$    \"$    ooo\"$oo  $$$\"o\n"
+	  "   o o o o    oo\"  o\"      \"o    $$o$\"     o o$\"\"  o$      \"$  "
+	  "\"oo   o o o o\n"
+	  "   \"$o   \"\"$$$\"   $$         $      \"   o   \"\"    o\"         $"
+	  "   \"o$$\"    o$$\n"
+	  "     \"\"o       o  $          $\"       $$$$$       o          $  ooo"
+	  "     o\"\"\n"
+	  "        \"o   $$$$o $o       o$        $$$$$\"       $o        \" $$$$"
+	  "   o\"\n"
+	  "         \"\"o $$$$o  oo o  o$\"         $$$$$\"        \"o o o o\"  "
+	  "\"$$$  $\n"
+	  "           \"\" \"$\"     \"\"\"\"\"            \"\"$\"            \""
+	  "\"\"      \"\"\" \"\n"
+	  "            \"oooooooooooooooooooooooooooooooooooooooooooooooooooooo$\n"
+	  "             \"$$$$\"$$$$\" $$$$$$$\"$$$$$$ \" \"$$$$$\"$$$$$$\"  $$$\""
+	  "\"$$$$\n"
+	  "              $$$oo$$$$   $$$$$$o$$$$$$o\" $$$$$$$$$$$$$$ o$$$$o$$$\"\n"
+	  "              $\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\""
+	  "\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"$\n"
+	  "              $\"                                                 \"$\n"
+	  "              $\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\"$\""
+	  "$\"$\"$\"$\"$\"$\"$\"$\n"
+	  "                                   You win!\n\n";
+		printf("%s\n", victory);
+	}
 	heap_delete(&h);
-	free(*characters);
+}
+
+void init_terminal(void){
+	initscr(); //creates stdscr
+	raw(); //allows input with no exit way
+	noecho(); //
+	curs_set(0); //
+	keypad(stdscr, TRUE); //
 }
 
 int main(int argc, char *argv[]){
@@ -1289,7 +1743,8 @@ int main(int argc, char *argv[]){
 	/*
 	contains whole distance map from PC based on Dijkstra's alg
 	*/
-
+	
+	// Character_t characters[MAX_MONSTERS];
 	Character_t *characters = malloc(MAX_MONSTERS * sizeof(Character_t));
 	/*
 	Array containing every monster in our dungeon
@@ -1297,6 +1752,9 @@ int main(int argc, char *argv[]){
 	
 	//Takes the time to randomize our room generation
 	srand(time(NULL));
+	
+	//initiates ncurses capabilities
+	init_terminal();
 	
 	/*
 	char *home = getenv("HOME");
@@ -1331,71 +1789,33 @@ int main(int argc, char *argv[]){
 		printf("Please enter: <--save, --load, --load--save> to perforam an action");
 		return -1;
 	}
-	
+
 	switch(action){
 		case load:
 			loadDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
-			generateDungeon(dungeon, hardness);
-			generateRooms(rooms, dungeon, hardness, &number_of_rooms);
-			generateCorridors(dungeon, rooms, &number_of_rooms, hardness, &number_of_upstairs);
-			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, PC);
-			printDungeon(dungeon);
-			roomHeatMapGenerator(PC, roomMap, hardness);
-			// printRoomHeatMap(roomMap, PC);
-			wholeHeatMapGenerator(PC, wholeMap, hardness);
-			// printWholeHeatMap(wholeMap, PC);
+			generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters);
+			printDungeon(dungeon, hardness);
 			// free(directory);	
 			break;
 		case save:
-			generateDungeon(dungeon, hardness);
-			generateRooms(rooms, dungeon, hardness, &number_of_rooms);
-			generateCorridors(dungeon, rooms, &number_of_rooms, hardness, &number_of_upstairs);
-			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, PC);
-			printDungeon(dungeon);
+			generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters);
 			saveDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
-			// roomHeatMapGenerator(PC, roomMap, hardness);
-			printRoomHeatMap(roomMap, PC);
-			// wholeHeatMapGenerator(PC, wholeMap, hardness);
-			printWholeHeatMap(wholeMap, PC);
+			printDungeon(dungeon, hardness);
 			// free(directory);
 			break;
 		case load_save:
 			loadDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
-			generateDungeon(dungeon, hardness);
-			generateRooms(rooms, dungeon, hardness, &number_of_rooms);
-			generateCorridors(dungeon, rooms, &number_of_rooms, hardness, &number_of_upstairs);
-			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, PC);
-			printDungeon(dungeon);
-			roomHeatMapGenerator(PC, roomMap, hardness);
-			// printRoomHeatMap(roomMap, PC);
-			wholeHeatMapGenerator(PC, wholeMap, hardness);
-			// printWholeHeatMap(wholeMap, PC);
+			generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters);
 			saveDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
+			printDungeon(dungeon, hardness);
 			// free(directory);
 			break;
 		case num_mon:
-			generateDungeon(dungeon, hardness);
-			generateRooms(rooms, dungeon, hardness, &number_of_rooms);
-			generateCorridors(dungeon, rooms, &number_of_rooms, hardness, &number_of_upstairs);
-			generateStairs(dungeon, hardness, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, PC);
-			roomHeatMapGenerator(PC, roomMap, hardness);
-			wholeHeatMapGenerator(PC, wholeMap, hardness);
-			while(i < num_Mon + 1){ //generate all the monsters and their characteristics
-				Character_t character;
-				if(i == 0){
-					character = generateMonsters(dungeon, hardness, PC, '@'); //generate the pc and its characteristcs
-				} else {
-					character = generateMonsters(dungeon, hardness, PC, 'm'); //generate the monsters and its characteristics
-					inSight(dungeon, &character, rooms, &number_of_rooms, PC); //check if the monster can see the PC
-				}
-				character.sn = i;
-				characters[i] = character;
-				i++;
-			}
-			simulateGame(dungeon, hardness, PC, &characters, roomMap, wholeMap, rooms, &num_Mon);
+			generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters);
+			simulateGame(characters, &num_Mon, dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms);
+			free(characters);
 			// free(directory);
 			break;
 	}
-	
 	return 0;
 }
