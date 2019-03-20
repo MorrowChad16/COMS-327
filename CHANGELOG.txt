@@ -1,0 +1,23 @@
+1-24: Created the game viewing border and area.
+Created random room generator
+
+1-25: Added rooms array to contain all rooms and their traits
+
+1-26: Added 6 or more rooms functionality
+Added a boolean like pre-for loop to check if space was occupied
+Added corridor generation, but I am receiving floating point exception
+Added up and down staircases
+
+1-28: I implemented a way to avoid the floating pointer issue
+
+2-5: I created the read and write functions for the dungeon with every part working properly
+
+2-6: I added Endian fixes
+I added connections to the integer references for key characteristics like number of rooms, etc.
+I added a malloc line for assigning space for our path/directory
+Implemented sub cases within the fuctions if it is loading the dungeon and not creating one
+Failed to implement in stairs
+Failed to implement switch case due to confusion with calling them
+
+2-7: I fixed the stair issue, I was calling the wrong address of the saved file for the coordinates and number
+The switch was implemented with --save, --load, and --load--save

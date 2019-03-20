@@ -1,8 +1,7 @@
-all: hello
+all: game
 	
-sobel: sobel.c
-	gcc -Wall -Werror -g3 sobel.c -o sobel
+game: game.c
+	gcc -g3 game.c -o game
 	
 clean: 
-	rm sobel
-	
+	rm game
