@@ -1,22 +1,15 @@
 This program builds on previous assignments
 
-This edition adds monsters with random qualities
-Monsters can have intelligence, telepathy, tunnelling and erratic behavior
+This edition adds user input on the pc after each round of movement
 
-Intelligence allows the monster to use the roomMap or wholeMap to calculate the shortest path
+If you click 'a' or any key that isn't programmed to do something it will display all of the possible moves for the PC
 
-Telepathy allows the monster to always remember the PC's location
+You can move to any of the 8 surroundings cells of the PC
 
-Tunnelling allows the PC to go through mutable rock
+I display messages at the bottom of the dungeon rather than the top. I prefer this, hopefully I don't lose points because of this.
 
-Erratic behavior has a 50% chance of randomly moving to a neighbors cell rather than towards the PC
+The monster list is seperate window from the dungeon window
 
-Monsters are defaulted to move randomly if they can't see the PC
+Whoever moves to the current cell occupied and theres another character there wins the fight automatically
 
-Each characteristic has a 50% of being true
-
-Added a "--nummon" (INT) to allow the user a varying number of monsters
-
-The default value is 1 monsters
-
-The MAX MONSTER size is 20!!!!!!
+YOU MUST ADD A COMMAND AFTER ./game TO AVOID A SEGMENTATION FAULT, DO NOT LEAVE IT BLANK!!!!
