@@ -36,4 +36,24 @@ I added functionality to the whole map function, only changing the added weight 
 2-15:I fixed the casting to a char issue by realizing I can store the variables in an int array and then print only what I need with the
 other values being left out. Never changing the internals of the array.
 
+2-19: I added a function to generate monsters with random characteristics
+I added a while loop to generate a set number of monsters
 
+2-20: I created a function that determines if the monster is in the same room as the PC so it remembers its coordinates
+I added the --nummon command to take in the number of monsters the user wants
+
+2-21: I added functionality for default monsters
+I added functionality for the erratic monsters
+
+2-22: I added the functionality for the telepathic monsters
+
+2-23: I added the functionality for the tunnelling monsters
+I added a function that deletes a monster form the character array when it is beaten
+
+2-24: I added the functionality for the intelligent monsters
+I have a segmentation fault when I have multiple monsters, but have yet to investigate the issue
+
+2-26: I added a PC and NPC struct to seperate the characteristics
+I fixed the segmentation fault. Just a logic error when determining move location
+
+2-27: I malloced the character array and free'd it once a monster found the PC
