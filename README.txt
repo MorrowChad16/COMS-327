@@ -1,11 +1,12 @@
-This program builds on previous HW assignments
+This assignment builds on previous assignments
 
-This one adds color to our monsters and objects on the dungeon floor
+Improved combat has been added, added killing a boss that ends the game
 
-We are now generating the monsters and objects from the text files parsed last assignment
+Monsters can no longer attack each other they will move to surrounding cell if it is not a monster or object or swap places in the worst case
 
-Every other action is the same with monsters and pc usage
+The PC is set with 200HP to begin with
+The PC is set with 1-4 attackDamage
 
-Objects can not be picked up right now, they can only be walked over
+The PC can no longer teleport to an object or monster because of the improve combat mechanics
 
-use the command './game' to render the game
+The PC can manipulate equipment with picking up, dropping and equiping. To pick up just walk over the piece.

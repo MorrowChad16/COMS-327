@@ -111,3 +111,13 @@ I changed around a few functions in simulateGame to refresh the character and ob
 I added an alive and lv variable for objects that act the exact same in characters
 I changed around a few "boolean" like integers to be actual booleans in C++
 I added color to the characters
+
+4-10: I added the ability to pick up the items
+I added two arrays for storage and equiped
+I added the additions to the PC specs when equiped
+
+4-12: I changed deleteMonst to add the new combat for the PC
+
+4-13: I changed deleteMonst to add the new combat for the NPC
+I added every key function for item usage
+I added the final touches with a cursor when viewing the items and the PC specs below the map

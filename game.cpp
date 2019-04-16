@@ -35,6 +35,8 @@ using namespace std;
 #define MAX_EQUIPMENT 100
 #define min(x, y) (x < y ? x : y)
 #define MESSAGES 21
+#define DEF_HEALTH 200
+#define NUM_STORAGE 10
 
 
 //defines user actions when running game.c
@@ -69,46 +71,6 @@ class Dice {
 		int base;
 		int dice;
 		int sides;
-};
-
-//implement PC and NPC classes later
-class Character_t {
-	public:
-		int s; //speed PC:10, MONST: 5-20
-		int i; //intelligence
-		int t; //telepathy
-		int tu; //tunneling ability
-		int e; //erratic
-		int p; //pass
-		int pu; //pickup
-		int d; //destroy
-		int u; //unique
-		int b; //final boss
-		int pcLoc[2]; //last known pc-location for intelligent monsters
-		char c; //Symbol for the character
-		bool a; //tells whether character is alive or not
-		int pos[2]; //position of character
-		int nt; //next turn value for priority queue
-		int sn; //sequence number for priority queue
-		heap_node_t *hn; //heap node for priority queue
-		char lv; //holds last value AKA value it is replacing while still
-		/*
-		0: BLACK
-		1: RED
-		2: GREEN
-		3: YELLOW
-		4: BLUE
-		5: MAGENTA
-		6: CYAN
-		7: WHITE
-		*/
-		Color color; //holds the color of the monster
-		//having issues with using strings so using char array instead
-		char name[78]; //holds the name of the monster
-		char description[1024]; //holds the description of the monster
-		int health; //Dice class for health
-		Dice attackDamage; //Dice class for attackDamage
-		int rarity; //odds of spawing the monster
 };
 
 class Items{
@@ -154,6 +116,49 @@ class Equipment{
 		bool a; //tells whether the equipment is alive or not/can be placed or not
 		int pos[2]; //position of equipment
 		char c; //holds the equipment character
+		bool isHeld;
+};
+
+//implement PC and NPC classes later
+class Character_t {
+	public:
+		int s; //speed PC:10, MONST: 5-20
+		int i; //intelligence
+		int t; //telepathy
+		int tu; //tunneling ability
+		int e; //erratic
+		int p; //pass
+		int pu; //pickup
+		int d; //destroy
+		int u; //unique
+		int b; //final boss
+		int pcLoc[2]; //last known pc-location for intelligent monsters
+		char c; //Symbol for the character
+		bool a; //tells whether character is alive or not
+		int pos[2]; //position of character
+		int nt; //next turn value for priority queue
+		int sn; //sequence number for priority queue
+		heap_node_t *hn; //heap node for priority queue
+		char lv; //holds last value AKA value it is replacing while still
+		/*
+		0: BLACK
+		1: RED
+		2: GREEN
+		3: YELLOW
+		4: BLUE
+		5: MAGENTA
+		6: CYAN
+		7: WHITE
+		*/
+		Color color; //holds the color of the monster
+		//having issues with using strings so using char array instead
+		char name[78]; //holds the name of the monster
+		char description[1024]; //holds the description of the monster
+		int health; //Dice class for health
+		Dice attackDamage; //Dice class for attackDamage
+		int rarity; //odds of spawing the monster
+		int storage[NUM_STORAGE]; //stores items index for the character to use later
+		int equiped[NUM_STORAGE + 2]; //1 slot for each type of item for the character to use
 };
 
 // class PC_t : public Character_t{
@@ -992,29 +997,115 @@ void printMonsters(Character_t monsters[MAX_MONSTERS], int *num_Mon){
 }
 
 //function deletes a monster and updates the characters array
-int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_MONSTERS], int newXpos, int newYpos, int *num_Mon, int isTeleporting){
-	int i, j;
-	if(!isTeleporting){ //not teleporting so add PC checking for new position
-		//skip 0: PC location
+int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_MONSTERS], int oldXpos, int *moveX, int oldYpos, int *moveY, int *num_Mon, bool isPC, Equipment equipment[MAX_EQUIPMENT]){
+	int i, j, index, tempX, tempY;
+	int newYpos = oldYpos + *moveY;
+	int newXpos = oldXpos + *moveX;
+	bool isPlaced = false;
+	char tempChar;
+	int loopThrough = 0;
+	int randLoc;
+	int randLocArr[8][2]; //X, Y
+	randLocArr[0][0] = 1;
+	randLocArr[0][1] = 0;
+	
+	randLocArr[1][0] = 1;
+	randLocArr[1][1] = 1;
+	
+	randLocArr[2][0] = 0;
+	randLocArr[2][1] = 1;
+	
+	randLocArr[3][0] = -1;
+	randLocArr[3][1] = 1;
+	
+	randLocArr[4][0] = -1;
+	randLocArr[4][1] = 0;
+	
+	randLocArr[5][0] = -1;
+	randLocArr[5][1] = -1;
+	
+	randLocArr[6][0] = 0;
+	randLocArr[6][1] = -1;
+	
+	randLocArr[7][0] = 1;
+	randLocArr[7][1] = -1;
+	
+	if(isPC){ //if the char is the PC then check if the new spot is a monster
 		for(i = 0; i < MAX_MONSTERS; i++){ //loops through all our characters
 			if(newYpos == characters[i].pos[Y_LOC] && newXpos == characters[i].pos[X_LOC] && characters[i].a){ //checks if the new position is occupied by a monster
-				dungeon[newYpos][newXpos] = characters[i].lv; //Replace the pos with the dungeon char
-				characters[i].a = false;
-				characters[i].pos[X_LOC] = 0;
-				characters[i].pos[Y_LOC] = 0;
-				return 1;
+				characters[i].health -= characters[0].attackDamage.base;
+				for(int m = 0; m < characters[0].attackDamage.dice; m++){
+					characters[i].health -= 1 + rand() % characters[0].attackDamage.sides;
+				} 
+				if(characters[i].health < 0){
+					dungeon[newYpos][newXpos] = characters[i].lv; //Replace the pos with the dungeon char
+					characters[i].a = false;
+					if(characters[i].b){
+						*num_Mon = 0;
+					}
+					characters[i].pos[X_LOC] = 0;
+					characters[i].pos[Y_LOC] = 0;
+					return 1;
+				}
+				*moveX = 0;
+				*moveY = 0;
 			}
 		}
-	} else { //is teleporting so skip the PC for the new position
-		for(i = 1; i < MAX_MONSTERS; i++){ //loops through all our characters
+		return 0;
+	} else { //if the char is an NPC then check if the spot is a monster
+		for(i = 0; i < MAX_MONSTERS; i++){ //loops through all our characters
 			if(newYpos == characters[i].pos[Y_LOC] && newXpos == characters[i].pos[X_LOC] && characters[i].a){ //checks if the new position is occupied by a monster
-				dungeon[newYpos][newXpos] = characters[i].lv; //Replace the pos with the dungeon char
-				characters[i].a = false;
-				characters[i].pos[X_LOC] = 0;
-				characters[i].pos[Y_LOC] = 0;
-				return 1;
+				
+				for(int b = 0; b < MAX_MONSTERS; b++){ //find monster we're attacking with
+					if(oldXpos == characters[b].pos[X_LOC] && oldYpos == characters[b].pos[Y_LOC]){
+						index = b;
+					}
+				}
+				
+				if(i == 0){ //reduce PC health
+					characters[0].health -= characters[index].attackDamage.base;
+					for(int b = 0; b < characters[index].attackDamage.dice; b++){
+						characters[0].health -= 1 + rand() % characters[index].attackDamage.sides;
+					}
+					*moveX = 0;
+					*moveY = 0;
+				}
+				
+				// if new location is occupied in that pos then move to a surrounding opening cell
+				while(!isPlaced && loopThrough < 16){
+					randLoc = rand() % 8;
+					if(dungeon[newYpos + randLocArr[randLoc][1]][newXpos + randLocArr[randLoc][0]] == '.' || dungeon[newYpos + randLocArr[randLoc][1]][newXpos + randLocArr[randLoc][0]] == ' ' || dungeon[newYpos + randLocArr[randLoc][1]][newXpos + randLocArr[randLoc][0]] == '#'){ //Right
+						*moveX += randLocArr[randLoc][0];
+						*moveY += randLocArr[randLoc][1];
+						isPlaced = true;
+					}
+					loopThrough++;
+				}
+				
+				if(!isPlaced) { //no new positions swap locations
+					*moveY = 0;
+					*moveX = 0;
+					// store the cell were about to override
+					tempX = characters[index].pos[X_LOC];
+					tempY = characters[index].pos[Y_LOC];
+					tempChar = characters[index].lv;
+					// first swap
+					characters[index].pos[X_LOC] = characters[i].pos[X_LOC];
+					characters[index].pos[Y_LOC] = characters[i].pos[Y_LOC];
+					characters[index].pos[Y_LOC] = characters[i].lv;
+					// second swap
+					characters[i].pos[X_LOC] = tempX;
+					characters[i].pos[Y_LOC] = tempY;
+					characters[i].lv = tempChar;
+				}
+				
+				if(characters[0].health < 0){
+					characters[0].a = false;
+					return 1;
+				}
 			}
 		}
+		return 0;
 	}
 	return 0;
 }
@@ -1050,9 +1141,40 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 						char fogDungeon[GAME_HEIGHT][GAME_WIDTH], int *num_Equip, Equipment equipment[MAX_EQUIPMENT]){
 	int row, col, i, cmnd, randX, randY, j, maxLoop;
 	int errorMessage = -1;
-	int key;
+	int key, eKey, iKey, temp;
 	int isError = 0;
+	bool isStored = false;
+	int cursLoc = 0;
+	bool takenOff = false;
+	int moveX, moveY, tempX, tempY;
+	char tempChar;
+	bool isDropped = false;
+	bool isSwapped = false;
+	int randLoc;
+	int randLocArr[8][2]; //X, Y
+	randLocArr[0][0] = 1;
+	randLocArr[0][1] = 0;
 	
+	randLocArr[1][0] = 1;
+	randLocArr[1][1] = 1;
+	
+	randLocArr[2][0] = 0;
+	randLocArr[2][1] = 1;
+	
+	randLocArr[3][0] = -1;
+	randLocArr[3][1] = 1;
+	
+	randLocArr[4][0] = -1;
+	randLocArr[4][1] = 0;
+	
+	randLocArr[5][0] = -1;
+	randLocArr[5][1] = -1;
+	
+	randLocArr[6][0] = 0;
+	randLocArr[6][1] = -1;
+	
+	randLocArr[7][0] = 1;
+	randLocArr[7][1] = -1;
 	
 	if(errorMessage == 3){
 		CMD:;
@@ -1074,6 +1196,25 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 		for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
 			fogDungeon[row][col] = dungeon[row][col];
 		}
+	}
+	
+	//check if the new location is over an item
+	if(characters[0].lv != '.' || characters[0].lv != '#'){ //location isn't a room or corridor so it must be an equipment item
+		for(int k = 0; k < NUM_STORAGE; k++){ //loop through PC storage to look for open slot to place the new item
+			if(characters[0].storage[k] == -1 && !isStored){ //character has an empty slot for a new item
+				for(int l = 0; l < *num_Equip; l++){ //loop through equipment to find the right one
+					if(characters[0].pos[Y_LOC] == equipment[l].pos[Y_LOC] && characters[0].pos[X_LOC] == equipment[l].pos[X_LOC] && !isStored){ //look for equipment with same position as PC
+						characters[0].storage[k] = l;
+						characters[0].lv = equipment[l].lv; //put equipment lv into the characters lv
+						isStored = true;
+						equipment[l].isHeld = true;
+						equipment[l].pos[X_LOC] = 0;
+						equipment[l].pos[Y_LOC] = 0;
+					}
+				}
+			}
+		}
+		isStored = false;
 	}
 	
 	//Pastes the fog dungeon
@@ -1177,16 +1318,19 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 		mvprintw(MESSAGES, 0, "YOU ARE NOT ON AN UP STAIR CASE!\n");
 	}
 	
+	printw("PC HP: %d	PC Speed: %d	PC DAMAGE: %d+%dd%d", characters[0].health, characters[0].s, characters[0].attackDamage.base, characters[0].attackDamage.dice, characters[0].attackDamage.sides);
 	key = getch();
 	switch(key) {
 		case 'y': //UP-LEFT
 			Y:;
 			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] - 1, characters[0].pos[Y_LOC] - 1, num_Mon, 0);
+				moveY = -1;
+				moveX = -1;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] -= 1; //Update Y
-				characters[0].pos[X_LOC] -= 1; //Update X
+				characters[0].pos[Y_LOC] += moveY; //Update Y
+				characters[0].pos[X_LOC] += moveX; //Update X
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
@@ -1206,9 +1350,11 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			
 			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC]]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], characters[0].pos[Y_LOC] - 1, num_Mon, 0);
+				moveY = -1;
+				moveX = 0;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] -= 1; //Update Y
+				characters[0].pos[Y_LOC] += moveY; //Update Y
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
@@ -1227,10 +1373,12 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			U:;
 			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] + 1, characters[0].pos[Y_LOC] - 1, num_Mon, 0);
+				moveY = -1;
+				moveX = 1;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] -= 1; //Update Y
-				characters[0].pos[X_LOC] += 1; //Update X
+				characters[0].pos[Y_LOC] += moveY; //Update Y
+				characters[0].pos[X_LOC] += moveX; //Update X
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
@@ -1249,9 +1397,11 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			L:;
 			if(!hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] + 1, characters[0].pos[Y_LOC], num_Mon, 0);
+				moveY = 0;
+				moveX = 1;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[X_LOC] += 1; //Update X
+				characters[0].pos[X_LOC] += moveX; //Update X
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 
@@ -1273,10 +1423,12 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			
 			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] + 1, characters[0].pos[Y_LOC] + 1, num_Mon, 0);
+				moveY = 1;
+				moveX = 1;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] += 1; //Update Y
-				characters[0].pos[X_LOC] += 1; //Update X
+				characters[0].pos[Y_LOC] += moveY; //Update Y
+				characters[0].pos[X_LOC] += moveX; //Update X
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
@@ -1295,9 +1447,11 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			J:;
 			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC]]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], characters[0].pos[Y_LOC] + 1, num_Mon, 0);
+				moveY = 1;
+				moveX = 0;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] += 1; //Update Y
+				characters[0].pos[Y_LOC] += moveY; //Update Y
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
@@ -1316,10 +1470,12 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			B:;
 			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] - 1, characters[0].pos[Y_LOC] + 1, num_Mon, 0);
+				moveY = 1;
+				moveX = -1;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] += 1; //Update Y
-				characters[0].pos[X_LOC] -= 1; //Update X
+				characters[0].pos[Y_LOC] += moveY; //Update Y
+				characters[0].pos[X_LOC] += moveX; //Update X
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
@@ -1338,9 +1494,11 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			H:;
 			if(!hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC] - 1, characters[0].pos[Y_LOC], num_Mon, 0);
+				moveY = 0;
+				moveX = -1;
+				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[X_LOC] -= 1; //Update X
+				characters[0].pos[X_LOC] += moveX; //Update X
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
@@ -1500,8 +1658,961 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			}
 			delwin(w);
 			break;
+		//-------------------------------------------------------------------------------------------------------------------------------
+		case 'i': //lists PC inventory/storage
+			WINDOW *i;
+			i = newwin(24, 80, 0, 0);
+			cursLoc = 0;
+			
+			INV:;
+			wrefresh(i);
+			clear();
+			for(int k = 0; k < NUM_STORAGE; k++){
+				printw("<%d>: %c", k, equipment[characters[0].storage[k]].c);
+				if(k == cursLoc){
+					printw(" <<");
+				}
+				printw("\n");
+			}
+			printw("Press ESC to return");
+			iKey = getch();
+			switch(iKey){
+				case KEY_UP:
+					if(cursLoc - 1 >= 0){
+						cursLoc--;
+					}
+					goto INV;	
+					break;
+				case KEY_DOWN:
+					if(cursLoc + 1 < NUM_STORAGE){
+						cursLoc++;
+					}
+					goto INV;
+					break;
+				case 27:
+					break;
+				case 'w': //wear the item
+					if(equipment[characters[0].storage[cursLoc]].equipment.weapon){
+						if(characters[0].equiped[0] == -1){ //if its empty then place it there
+							characters[0].equiped[0] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[0];
+							characters[0].s -= equipment[characters[0].equiped[0]].SB;
+							characters[0].health -= equipment[characters[0].equiped[0]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[0] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the weapon: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.offhand){
+						if(characters[0].equiped[1] == -1){ //if its empty then place it there
+							characters[0].equiped[1] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[1];
+							characters[0].s -= equipment[characters[0].equiped[1]].SB;
+							characters[0].health -= equipment[characters[0].equiped[1]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[1] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the offhand: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.ranged){
+						if(characters[0].equiped[2] == -1){ //if its empty then place it there
+							characters[0].equiped[2] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[2];
+							characters[0].s -= equipment[characters[0].equiped[2]].SB;
+							characters[0].health -= equipment[characters[0].equiped[2]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[2] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the ranged weapon: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.armor){
+						if(characters[0].equiped[3] == -1){ //if its empty then place it there
+							characters[0].equiped[3] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[3];
+							characters[0].s -= equipment[characters[0].equiped[3]].SB;
+							characters[0].health -= equipment[characters[0].equiped[3]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[3] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the armor: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.helmet){
+						if(characters[0].equiped[4] == -1){ //if its empty then place it there
+							characters[0].equiped[4] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[4];
+							characters[0].s -= equipment[characters[0].equiped[4]].SB;
+							characters[0].health -= equipment[characters[0].equiped[4]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[4] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the helmet: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.cloak){
+						if(characters[0].equiped[5] == -1){ //if its empty then place it there
+							characters[0].equiped[5] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[5];
+							characters[0].s -= equipment[characters[0].equiped[5]].SB;
+							characters[0].health -= equipment[characters[0].equiped[5]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[5] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the cloak: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.gloves){
+						if(characters[0].equiped[6] == -1){ //if its empty then place it there
+							characters[0].equiped[6] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[6];
+							characters[0].s -= equipment[characters[0].equiped[6]].SB;
+							characters[0].health -= equipment[characters[0].equiped[6]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[6] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the gloves: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.boots){
+						if(characters[0].equiped[7] == -1){ //if its empty then place it there
+							characters[0].equiped[7] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[7];
+							characters[0].s -= equipment[characters[0].equiped[7]].SB;
+							characters[0].health -= equipment[characters[0].equiped[7]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[7] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the boots: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.amulet){
+						if(characters[0].equiped[8] == -1){ //if its empty then place it there
+							characters[0].equiped[8] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[8];
+							characters[0].s -= equipment[characters[0].equiped[8]].SB;
+							characters[0].health -= equipment[characters[0].equiped[8]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[8] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the amulet: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.light){
+						if(characters[0].equiped[9] == -1){ //if its empty then place it there
+							characters[0].equiped[9] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[9];
+							characters[0].s -= equipment[characters[0].equiped[9]].SB;
+							characters[0].health -= equipment[characters[0].equiped[9]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[9] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the light: %c\n", equipment[characters[0].storage[cursLoc]]);
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.ring){
+						if(characters[0].equiped[10] == -1){ //if its empty then place it there
+							characters[0].equiped[10] = characters[0].storage[cursLoc];
+						} else if(characters[0].equiped[11] == -1){ //if its empty then place it there
+							characters[0].equiped[11] = characters[0].storage[cursLoc];
+						} else { //flip the character index locations from the storage and equiped if its occupied
+							isSwapped = true;
+							temp = characters[0].equiped[10];
+							characters[0].s -= equipment[characters[0].equiped[10]].SB;
+							characters[0].health -= equipment[characters[0].equiped[10]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[10] = characters[0].storage[cursLoc];
+							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+							characters[0].storage[cursLoc] = temp;
+						}
+						printw("You equiped the armor: %c\n", equipment[characters[0].storage[cursLoc]]);
+					}
+					if(!isSwapped){
+						characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
+						characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
+						characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
+						characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
+						characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
+						characters[0].storage[cursLoc] = -1;
+					}
+					isSwapped = false;
+					goto INV;
+					break;
+				case 'd': //drop the item
+					equipment[characters[0].storage[cursLoc]].isHeld = false; //item is no longer held by the PC
+					while(!isDropped){
+						randLoc = rand() % 8;
+						if(hardness[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == 0){ //Right
+							//if the space is open then don't worry about updating info
+							if(dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == '.' || dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] +  + randLocArr[randLoc][0]] == '#'){
+								dungeon[characters[0].pos[Y_LOC]  + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] = equipment[characters[0].storage[cursLoc]].c;
+								equipment[characters[0].storage[cursLoc]].pos[Y_LOC] = characters[0].pos[Y_LOC] + randLocArr[randLoc][1];
+								equipment[characters[0].storage[cursLoc]].pos[X_LOC] = characters[0].pos[X_LOC] + randLocArr[randLoc][0];
+								isDropped = true;
+							} else { //space is occupied
+								for(int h = 0; h < *num_Mon; h++){ //find monster in space
+									if(characters[0].pos[Y_LOC] + randLocArr[randLoc][1] == characters[h].pos[Y_LOC] && characters[0].pos[X_LOC] + randLocArr[randLoc][0] == characters[h].pos[X_LOC]){
+										if(characters[h].lv == '.' || characters[h].lv == '#'){ //monster doesn't have an object as its lv already
+											characters[h].lv = equipment[characters[0].storage[cursLoc]].c;
+											equipment[characters[0].storage[cursLoc]].pos[Y_LOC] = characters[0].pos[Y_LOC] + randLocArr[randLoc][1];
+											equipment[characters[0].storage[cursLoc]].pos[X_LOC] = characters[0].pos[X_LOC] + randLocArr[randLoc][0];
+											isDropped = true;
+										}
+									}
+								}
+							}
+						}
+					}
+					isDropped = false;
+					printw("You dropped the item: %c\n", equipment[characters[0].storage[cursLoc]]);
+					characters[0].storage[cursLoc] = -1; //the storage slot on the pc is emptied
+					goto INV;
+					break;
+				case 'x': //delete the item
+					equipment[characters[0].storage[cursLoc]].a = false; //item is destroyed when expunged
+					equipment[characters[0].storage[cursLoc]].isHeld = false; //item is destroyed when expunged
+					printw("You deleted the item: %c\n", equipment[characters[0].storage[cursLoc]]);
+					characters[0].storage[cursLoc] = -1; //the storage slot on the pc is emptied
+					goto INV;
+					break;
+				case 'I': //examine the item
+					wrefresh(i);
+					clear();
+					printw("%c\n", equipment[characters[0].storage[cursLoc]].c);
+					printw("NAME: ");
+					for(int k = 0; k < 78; k++){
+						printw("%c", equipment[characters[0].storage[cursLoc]].name[k]);
+					}
+					printw("\n");
+					printw("DESCRIPTION: ");
+					for(int k = 0; k < 1024; k++){
+						printw("%c", equipment[characters[0].storage[cursLoc]].description[k]);
+					}
+					printw("\n");
+					printw("EQUIPMENT TYPE: ");
+					if(equipment[characters[0].storage[cursLoc]].equipment.weapon){
+						printw("Weapon\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.offhand){
+						printw("Offhand\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.ranged){
+						printw("Ranged\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.armor){
+						printw("Armor\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.helmet){
+						printw("Helmet\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.cloak){
+						printw("Cloak\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.gloves){
+						printw("Gloves\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.boots){
+						printw("Boots\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.ring){
+						printw("Ring\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.amulet){
+						printw("Amulet\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.light){
+						printw("Light\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.scroll){
+						printw("Scroll\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.book){
+						printw("Book\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.flask){
+						printw("Flask\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.gold){
+						printw("Gold\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.ammunition){
+						printw("Ammunition\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.food){
+						printw("Food\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.wand){
+						printw("Wand\n");
+					} else if(equipment[characters[0].storage[cursLoc]].equipment.container){
+						printw("Container\n");
+					}
+					printw("COLOR: ");
+					if(equipment[characters[0].storage[cursLoc]].color.RED){
+						printw("Red\n");
+					} else if(equipment[characters[0].storage[cursLoc]].color.GREEN){
+						printw("Green\n");
+					} else if(equipment[characters[0].storage[cursLoc]].color.YELLOW){
+						printw("Yellow\n");
+					} else if(equipment[characters[0].storage[cursLoc]].color.BLUE){
+						printw("Blue\n");
+					} else if(equipment[characters[0].storage[cursLoc]].color.MAGENTA){
+						printw("Magenta\n");
+					} else if(equipment[characters[0].storage[cursLoc]].color.CYAN){
+						printw("Cyan\n");
+					} else if(equipment[characters[0].storage[cursLoc]].color.WHITE){
+						printw("White\n");
+					} 
+					printw("HIT BONUS: %d\n", equipment[characters[0].storage[cursLoc]].HB);
+					printw("DAMAGE BONUS: %d+%dd%d\n", equipment[characters[0].storage[cursLoc]].DB.base, equipment[characters[0].storage[cursLoc]].DB.dice, equipment[characters[0].storage[cursLoc]].DB.sides);
+					printw("DODGE BONUS: %d\n", equipment[characters[0].storage[cursLoc]].DDB);
+					printw("DEFENSE BONUS: %d\n", equipment[characters[0].storage[cursLoc]].DFB);
+					printw("WEIGHT: %d\n", equipment[characters[0].storage[cursLoc]].weight);
+					printw("SPEED BONUS: %d\n", equipment[characters[0].storage[cursLoc]].SB);
+					printw("VALUE: %d\n", equipment[characters[0].storage[cursLoc]].value);
+					printw("STATUS: %b\n", equipment[characters[0].storage[cursLoc]].status);
+					printw("RARITY: %d\n", equipment[characters[0].storage[cursLoc]].rarity);
+					printw("Y: %d X: %d\n", equipment[characters[0].storage[cursLoc]].pos[Y_LOC], equipment[characters[0].storage[cursLoc]].pos[X_LOC]);
+					printw("SPECIAL ATTRIBUTE: %b\n", equipment[characters[0].storage[cursLoc]].SA);
+					printw("\nPRESS ANY KEY TO EXIT");
+					iKey = getch();
+					switch(iKey){
+						default:
+							break;
+					}
+					goto INV;
+					break;
+				default:
+					goto INV;
+					break;
+			}
+			delwin(i);
+			goto DFT;
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------
+		case 'e': //lists PC equiped items
+			WINDOW *e;
+			e = newwin(24, 80, 0, 0);
+			cursLoc = 0;
+			
+			EQP:;
+			wrefresh(e);
+			clear();
+			for(int k = 0; k < NUM_STORAGE + 2; k++){
+				if(k == 0){
+					printw("<a>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 1){
+					printw("<b>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 2){
+					printw("<c>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 3){
+					printw("<d>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 4){
+					printw("<e>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 5){
+					printw("<f>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 6){
+					printw("<g>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 7){
+					printw("<h>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 8){
+					printw("<i>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 9){
+					printw("<j>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 10){
+					printw("<k>: %c", equipment[characters[0].equiped[k]].c);
+				} else if(k == 11){
+					printw("<l>: %c", equipment[characters[0].equiped[k]].c);
+				} 
+				if(k == cursLoc){
+					printw("<<");
+				}
+				printw("\n");
+			}
+			
+			printw("Press ESC to return\n");
+			eKey = getch();
+			switch(eKey){
+				case KEY_UP:
+					if(cursLoc - 1 >= 0){
+						cursLoc--;
+					}
+					goto EQP;	
+					break;
+				case KEY_DOWN:
+					if(cursLoc + 1 < NUM_STORAGE + 2){
+						cursLoc++;
+					}
+					goto EQP;
+					break;
+				case 27:
+					break;
+				case 'd': //drop the item
+					equipment[characters[0].equiped[cursLoc]].isHeld = false; //item is destroyed when dropped but not expunged
+					characters[0].s -= equipment[characters[0].equiped[cursLoc]].SB;
+					characters[0].health -= equipment[characters[0].equiped[cursLoc]].DFB;
+					characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+					characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+					characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+					while(!isDropped){
+						randLoc = rand() % 8;
+						if(hardness[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == 0){ //Right
+							//if the space is open then don't worry about updating info
+							if(dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == '.' || dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] +  + randLocArr[randLoc][0]] == '#'){
+								dungeon[characters[0].pos[Y_LOC]  + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] = equipment[characters[0].equiped[cursLoc]].c;
+								equipment[characters[0].equiped[cursLoc]].pos[Y_LOC] = characters[0].pos[Y_LOC] + randLocArr[randLoc][1];
+								equipment[characters[0].equiped[cursLoc]].pos[X_LOC] = characters[0].pos[X_LOC] + randLocArr[randLoc][0];
+								isDropped = true;
+							} else { //space is occupied
+								for(int h = 0; h < *num_Mon; h++){ //find monster in space
+									if(characters[0].pos[Y_LOC] + randLocArr[randLoc][1] == characters[h].pos[Y_LOC] && characters[0].pos[X_LOC] + randLocArr[randLoc][0] == characters[h].pos[X_LOC]){
+										if(characters[h].lv == '.' || characters[h].lv == '#'){ //monster doesn't have an object as its lv already
+											characters[h].lv = equipment[characters[0].equiped[cursLoc]].c;
+											equipment[characters[0].equiped[cursLoc]].pos[Y_LOC] = characters[0].pos[Y_LOC] + randLocArr[randLoc][1];
+											equipment[characters[0].equiped[cursLoc]].pos[X_LOC] = characters[0].pos[X_LOC] + randLocArr[randLoc][0];
+											isDropped = true;
+										}
+									}
+								}
+							}
+						}
+					}
+					isDropped = false;
+					printw("You dropped the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
+					characters[0].equiped[cursLoc] = -1; //the equiped slot on the pc is emptied
+					goto EQP;
+					break;
+				case 'x': //delete the item
+					equipment[characters[0].equiped[cursLoc]].a = false; //item is destroyed when dropped
+					equipment[characters[0].equiped[cursLoc]].isHeld = false; //item is destroyed when expunged
+					characters[0].s -= equipment[characters[0].equiped[cursLoc]].SB;
+					characters[0].health -= equipment[characters[0].equiped[cursLoc]].DFB;
+					characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+					characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+					characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+					characters[0].equiped[cursLoc] = -1; //the equiped slot on the pc is emptied
+					printw("You deleted the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
+					goto EQP;
+					break;
+				case 't': //take off item
+					for(int m = 0; m < NUM_STORAGE; m++){
+						if(characters[0].storage[m] == -1){
+							characters[0].storage[m] = characters[0].equiped[cursLoc];
+							printw("You took off the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
+							characters[0].s -= equipment[characters[0].equiped[cursLoc]].SB;
+							characters[0].health -= equipment[characters[0].equiped[cursLoc]].DFB;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].equiped[cursLoc] = -1;
+							takenOff = true;
+						}
+					}
+					if(!takenOff){
+						printw("Unable to take off item, no storage available\n");
+					}
+					goto EQP;
+					break;
+				case 'I': //examine the item
+					wrefresh(e);
+					clear();
+					printw("%c\n", equipment[characters[0].equiped[cursLoc]].c);
+					printw("NAME: ");
+					for(int k = 0; k < 78; k++){
+						printw("%c", equipment[characters[0].equiped[cursLoc]].name[k]);
+					}
+					printw("\n");
+					printw("DESCRIPTION: ");
+					for(int k = 0; k < 1024; k++){
+						printw("%c", equipment[characters[0].equiped[cursLoc]].description[k]);
+					}
+					printw("\n");
+					printw("EQUIPMENT TYPE: ");
+					if(equipment[characters[0].equiped[cursLoc]].equipment.weapon){
+						printw("Weapon\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.offhand){
+						printw("Offhand\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.ranged){
+						printw("Ranged\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.armor){
+						printw("Armor\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.helmet){
+						printw("Helmet\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.cloak){
+						printw("Cloak\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.gloves){
+						printw("Gloves\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.boots){
+						printw("Boots\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.ring){
+						printw("Ring\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.amulet){
+						printw("Amulet\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.light){
+						printw("Light\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.scroll){
+						printw("Scroll\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.book){
+						printw("Book\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.flask){
+						printw("Flask\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.gold){
+						printw("Gold\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.ammunition){
+						printw("Ammunition\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.food){
+						printw("Food\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.wand){
+						printw("Wand\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].equipment.container){
+						printw("Container\n");
+					}
+					printw("COLOR: ");
+					if(equipment[characters[0].equiped[cursLoc]].color.RED){
+						printw("Red\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].color.GREEN){
+						printw("Green\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].color.YELLOW){
+						printw("Yellow\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].color.BLUE){
+						printw("Blue\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].color.MAGENTA){
+						printw("Magenta\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].color.CYAN){
+						printw("Cyan\n");
+					} else if(equipment[characters[0].equiped[cursLoc]].color.WHITE){
+						printw("White\n");
+					} 
+					printw("HIT BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].HB);
+					printw("DAMAGE BONUS: %d+%dd%d\n", equipment[characters[0].equiped[cursLoc]].DB.base, equipment[characters[0].equiped[cursLoc]].DB.dice, equipment[characters[0].equiped[cursLoc]].DB.sides);
+					printw("DODGE BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].DDB);
+					printw("DEFENSE BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].DFB);
+					printw("WEIGHT: %d\n", equipment[characters[0].equiped[cursLoc]].weight);
+					printw("SPEED BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].SB);
+					printw("VALUE: %d\n", equipment[characters[0].equiped[cursLoc]].value);
+					printw("STATUS: %b\n", equipment[characters[0].equiped[cursLoc]].status);
+					printw("RARITY: %d\n", equipment[characters[0].equiped[cursLoc]].rarity);
+					printw("Y: %d X: %d\n", equipment[characters[0].equiped[cursLoc]].pos[Y_LOC], equipment[characters[0].equiped[cursLoc]].pos[X_LOC]);
+					printw("SPECIAL ATTRIBUTE: %b\n", equipment[characters[0].equiped[cursLoc]].SA);
+					printw("\nPRESS ANY KEY TO EXIT");
+					eKey = getch();
+					switch(eKey){
+						default:
+							break;
+					}
+					goto EQP;
+					break;
+				default:
+					goto EQP;
+					break;
+			}
+			delwin(e);
+			goto DFT;
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------
+		case 'L':
+			//change the PC character to the dungeon character, update the specs later after user has chosen position to move
+			dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv;
+			fogDungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv;
+			tempX = characters[0].pos[X_LOC];
+			tempY = characters[0].pos[Y_LOC];
+			LCS:;
+			refresh();
+			clear();
+			for(row = 0; row < GAME_HEIGHT; row++){
+				for(col = 0; col < GAME_WIDTH; col++){
+					if(row == characters[0].pos[Y_LOC] && col == characters[0].pos[X_LOC]){ //print '*' for the place the user plans on moving
+						mvaddch(row, col, '*');
+					} else { //print normal dungeon
+						if(dungeon[row][col] == '.' || dungeon[row][col] == '#' || dungeon[row][col] == ' ' || dungeon[row][col] == '|' 
+						|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>'){ //always white
+						mvaddch(row, col, dungeon[row][col]);
+						} else {
+							j = 0;
+							//Could use macro here to speed up but forgot how to and I'm lazy
+							if(*num_Mon > *num_Equip){
+								maxLoop = *num_Mon;
+							} else {
+								maxLoop = *num_Equip;
+							}
+							//REALLY LENGTHY WAY OF DOING THIS, HAVE TO BE AN EASIER TO WAY TO QUICKLY LOOK UP WHAT COLOR AND CHARACTER IS THERE
+							while(j < maxLoop){
+								if(characters[j].pos[Y_LOC] == row && characters[j].pos[X_LOC] == col && characters[j].a){ //generates monsters with colors
+									if(characters[j].color.BLACK){
+										attron(COLOR_PAIR(COLOR_BLACK));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLACK));
+									} else if(characters[j].color.RED){
+										attron(COLOR_PAIR(COLOR_RED));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_RED));
+									} else if(characters[j].color.GREEN){
+										attron(COLOR_PAIR(COLOR_GREEN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_GREEN));
+									} else if(characters[j].color.YELLOW){
+										attron(COLOR_PAIR(COLOR_YELLOW));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_YELLOW));
+									} else if(characters[j].color.BLUE){
+										attron(COLOR_PAIR(COLOR_BLUE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLUE));
+									} else if(characters[j].color.MAGENTA){
+										attron(COLOR_PAIR(COLOR_MAGENTA));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_MAGENTA));
+									} else if(characters[j].color.CYAN){
+										attron(COLOR_PAIR(COLOR_CYAN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_CYAN));
+									} else if(characters[j].color.WHITE){
+										attron(COLOR_PAIR(COLOR_WHITE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_WHITE));
+									}
+								} else if(equipment[j].pos[Y_LOC] == row && equipment[j].pos[X_LOC] == col && equipment[j].a){ //generates equipment with colors
+									if(equipment[j].color.BLACK){
+										attron(COLOR_PAIR(COLOR_BLACK));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLACK));
+									} else if(equipment[j].color.RED){
+										attron(COLOR_PAIR(COLOR_RED));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_RED));
+									} else if(equipment[j].color.GREEN){
+										attron(COLOR_PAIR(COLOR_GREEN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_GREEN));
+									} else if(equipment[j].color.YELLOW){
+										attron(COLOR_PAIR(COLOR_YELLOW));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_YELLOW));
+									} else if(equipment[j].color.BLUE){
+										attron(COLOR_PAIR(COLOR_BLUE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLUE));
+									} else if(equipment[j].color.MAGENTA){
+										attron(COLOR_PAIR(COLOR_MAGENTA));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_MAGENTA));
+									} else if(equipment[j].color.CYAN){
+										attron(COLOR_PAIR(COLOR_CYAN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_CYAN));
+									} else if(equipment[j].color.WHITE){
+										attron(COLOR_PAIR(COLOR_WHITE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_WHITE));
+									} 
+								}
+								j++;
+							}
+						}
+					}
+				}
+			}
+			if(isError){
+				OOPS:;
+				clear();
+				mvprintw(0, 0, "Commands:\n<7 or y>: Move Cursor Up-Left\n<8 or k>: Move Cursor Up\n<9 or u>: Move Cursor Up-Right\n<6 or l>: Move Cursor Right\n<3 or n>: Move Cursor Down-Right\n<2 or j>: Move Cursor Down\n<1 or b>: Move Cursor Down-Left\n<4 or h>: Move Cursor Left\n<t>: Look at object info\n\nPress ESC to exit");
+				cmnd = getch();
+				switch(cmnd){
+					default:
+						isError = 0;
+						goto BSC;
+						break;
+				}
+			}
+			cmnd = getch();
+			switch(cmnd){
+				case 'y': //UP-LEFT
+					HM:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] - 1] != 255){
+						characters[0].pos[Y_LOC] -= 1;
+						characters[0].pos[X_LOC] -= 1;
+					}
+					goto LCS;
+					break;
+				case '7': //UP-LEFT
+					goto HM; //Goes to default UP-LEFT case
+					break;
+				case KEY_HOME: //UP-LEFT
+					goto HM; //Goes to default UP-LEFT case
+					break;
+				//-------------------------------------------------------------------------------------------------------------------------------	
+				case 'k': //UP
+					UPS:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC]] != 255){
+						characters[0].pos[Y_LOC] -= 1;
+					}
+					goto LCS;
+					break;
+				case '8': //UP
+					goto UPS; //Goes to default UP case
+					break;
+				case KEY_UP: //UP
+					goto UPS; //Goes to default UP case
+					break;
+				//-------------------------------------------------------------------------------------------------------------------------------	
+				case 'u': //UP-RIGHT
+					URS:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] + 1] != 255){
+						characters[0].pos[Y_LOC] -= 1;
+						characters[0].pos[X_LOC] += 1;
+					}
+					goto LCS;
+					break;
+				case '9': //UP-RIGHT
+					goto URS; //Goes to default UP-RIGHT case
+					break;
+				case KEY_PPAGE: //UP-RIGHT
+					goto URS; //Goes to default UP-RIGHT case
+					break;
+				//-------------------------------------------------------------------------------------------------------------------------------	
+				case 'l': //RIGHT
+					RGS:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] + 1] != 255){
+						characters[0].pos[X_LOC] += 1;
+					}
+					goto LCS;
+					break;
+				case '6': //RIGHT
+					goto RGS; //Goes to default RIGHT case
+					break;
+				case KEY_RIGHT: //RIGHT
+					goto RGS; //Goes to default RIGHT case
+					break;
+				//-------------------------------------------------------------------------------------------------------------------------------	
+				case 'n': //DOWN-RIGHT
+					DRS:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] + 1] != 255){
+						characters[0].pos[Y_LOC] += 1;
+						characters[0].pos[X_LOC] += 1;
+					}
+					goto LCS;
+					break;
+				case '3': //DOWN-RIGHT
+					goto DRS; //Goes to default DOWN-RIGHT case
+					break;
+				case KEY_NPAGE: //DOWN-RIGHT
+					goto DRS; //Goes to default DOWN-RIGHT case 
+					break;
+				//-------------------------------------------------------------------------------------------------------------------------------	
+				case 'j': //DOWN
+					DS:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC]] != 255){
+						characters[0].pos[Y_LOC] += 1;
+					}
+					goto LCS;
+					break;
+				case '2': //DOWN
+					goto DS; //Goes to default DOWN case
+					break;
+				case KEY_DOWN: //DOWN
+					goto DS; //Goes to default DOWN case
+					break;
+				//-------------------------------------------------------------------------------------------------------------------------------	
+				case 'b': //DOWN-LEFT
+					DLS:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] - 1] != 255){
+						characters[0].pos[Y_LOC] += 1;
+						characters[0].pos[X_LOC] -= 1;
+					}
+					goto LCS;
+					break;
+				case '1': //DOWN-LEFT
+					goto DLS; //Goes to default DOWN-LEFT case
+					break;
+				case KEY_END: //DOWN-LEFT
+					goto DLS; //Goes to default DOWN-LEFT case
+					break;
+				//-------------------------------------------------------------------------------------------------------------------------------	
+				case 'h': //LEFT
+					LFS:;
+					//Update '*' position
+					if(hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] - 1] != 255){
+						characters[0].pos[X_LOC] -= 1;
+					}
+					goto LCS;
+					break;
+				case '4': //LEFT
+					goto LFS; //Goes to default LEFT case
+					break;
+				case KEY_LEFT: //LEFT
+					goto LFS; //Goes to default LEFT case
+					break;
+				case 't': //Look at item or monster info
+					if(characters[0].pos[X_LOC] != ' ' || characters[0].pos[X_LOC] != '.' || characters[0].pos[X_LOC] != '#'){
+						WINDOW *t;
+						t = newwin(24, 80, 0, 0);
+						for(int d = 1; d < *num_Mon; d++){
+							if(characters[0].pos[Y_LOC] == characters[d].pos[Y_LOC] && characters[0].pos[X_LOC] == characters[d].pos[X_LOC]){
+								wrefresh(i);
+								clear();
+								printw("%c\n", characters[d].c);
+								printw("NAME: ");
+								for(int k = 0; k < 78; k++){
+									printw("%c", characters[d].name[k]);
+								}
+								printw("\n");
+								printw("DESCRIPTION: ");
+								for(int k = 0; k < 1024; k++){
+									printw("%c", characters[0].description[k]);
+								}
+								printw("\n");
+								printw("COLOR: ");
+								if(characters[d].color.RED){
+									printw("Red\n");
+								} else if(characters[d].color.GREEN){
+									printw("Green\n");
+								} else if(characters[d].color.YELLOW){
+									printw("Yellow\n");
+								} else if(characters[d].color.BLUE){
+									printw("Blue\n");
+								} else if(characters[d].color.MAGENTA){
+									printw("Magenta\n");
+								} else if(characters[d].color.CYAN){
+									printw("Cyan\n");
+								} else if(characters[d].color.WHITE){
+									printw("White\n");
+								} 
+								printw("SPEED: %d\n", characters[d].s);
+								printw("ABILITIES:\n");
+								if(characters[d].i){
+									printw("INTELLIGENT\n");
+								}
+								if(characters[d].t){
+									printw("TELEPATHIC\n");
+								}
+								if(characters[d].tu){
+									printw("TUNNEL\n");
+								}
+								if(characters[d].e){
+									printw("ERRATIC\n");
+								}
+								if(characters[d].p){
+									printw("PASS\n");
+								}
+								if(characters[d].pu){
+									printw("PICK UP\n");
+								}
+								if(characters[d].d){
+									printw("DESTROY\n");
+								}
+								if(characters[d].u){
+									printw("UNIQUE\n");
+								}
+								if(characters[d].b){
+									printw("FINAL BOSS\n");
+								}
+								printw("HITPOINTS: %d\n", characters[d].health);
+								printw("DAMAGE: %d+%dd%d\n", characters[d].attackDamage.base, characters[d].attackDamage.dice, characters[d].attackDamage.sides);
+								printw("RARITY: %d\n", characters[d].rarity);
+								printw("Y: %d X: %d\n", characters[d].pos[Y_LOC], characters[d].pos[X_LOC]);
+								printw("\nPRESS ANY KEY TO EXIT");
+								iKey = getch();
+								switch(iKey){
+									default:
+										break;
+								}
+							}
+						}
+						goto LCS;
+						break;
+					case 27:
+						//reset all the info
+						characters[0].pos[Y_LOC] = dungeon[tempY][tempX];
+						characters[0].pos[Y_LOC] = tempY;
+						characters[0].pos[X_LOC] = tempX;
+						dungeon[tempY][tempX] = characters[0].c;
+						fogDungeon[tempY][tempX] = characters[0].c;
+						break;
+					default:
+						goto OOPS;
+						break;
+					}
+			}
+			break;
 		case 't':
-			// teleportPC(dungeon, fogDungeon, hardness, characters, num_Mon);
+			//teleportPC(dungeon, fogDungeon, hardness, characters, num_Mon);
 			//change the PC character to the dungeon character, update the specs later after user has chosen position to move
 			dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv;
 			fogDungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv;
@@ -1743,31 +2854,37 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 					//with these random values we can never reach the immutable rock
 					randY = 2 + rand() % (GAME_HEIGHT - 3);
 					randX = 2 + rand() % (GAME_WIDTH - 3);
-					characters[0].pos[Y_LOC] = randY; //apply new pos to the PC
-					characters[0].pos[X_LOC] = randX; //apply new pos to the PC
-					deleteMonster(dungeon, characters, characters[0].pos[X_LOC], characters[0].pos[Y_LOC], num_Mon, 1); //Checks if space is occupied by a monster
-					if(dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] == ' '){
-						characters[0].lv = '#';
-					} else {
-						characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]];
-					}
-					dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //put PC in dungeon
-					//updates fog map for user
-					for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
-						for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
-							fogDungeon[row][col] = dungeon[row][col];
+					if(dungeon[randY][randX] == '.' || dungeon[randY][randX] == ' ' || dungeon[randY][randX] == '#'){
+						characters[0].pos[Y_LOC] = randY; //apply new pos to the PC
+						characters[0].pos[X_LOC] = randX; //apply new pos to the PC
+						if(dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] == ' '){
+							characters[0].lv = '#';
+						} else {
+							characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]];
 						}
+						dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //put PC in dungeon
+						//updates fog map for user
+						for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
+							for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
+								fogDungeon[row][col] = dungeon[row][col];
+							}
+						}
+					} else {
+						goto BSC;
 					}
 					break;
 				case 't': //user chosen position
-					deleteMonster(dungeon, characters, characters[0].pos[X_LOC], characters[0].pos[Y_LOC], num_Mon, 1); //Checks if space is occupied by a monster
-					characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //update PC's lv
-					dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update the dungeon with the new PC location
-					//updates fog map for user
-					for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
-						for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
-							fogDungeon[row][col] = dungeon[row][col];
+					if(dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] == '.' || dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] == ' ' || dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] == '#'){
+						characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //update PC's lv
+						dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update the dungeon with the new PC location
+						//updates fog map for user
+						for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
+							for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
+								fogDungeon[row][col] = dungeon[row][col];
+							}
 						}
+					} else {
+						goto BSC;
 					}
 					break;
 				default:
@@ -1842,6 +2959,14 @@ void generateMonsters(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT
 			characters[0].nt = 0;
 			characters[0].sn = 0;
 			characters[i].a = true;
+			characters[0].health = DEF_HEALTH;
+			characters[0].attackDamage.base = 0;
+			characters[0].attackDamage.dice = 1;
+			characters[0].attackDamage.sides = 4;
+			for(int m = 0; m < NUM_STORAGE; m++){ //sets the default arrays to be 'empty'
+				characters[0].storage[m] = -1;
+				characters[0].equiped[m] = -1;
+			}
 		} else {
 			int rarityNum = rand() % 100;
 			if(rarityNum < characters[i].rarity && characters[i].a){ //if the rarity num is less than the monsters rarity and its alive
@@ -1882,7 +3007,7 @@ void generateEquipment(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGH
 	bool equipPlaced = false;
 	while(i <= *num_Equip && numEquip < minEquip){ //generate all the equipment and place them if rarity allows
 		int rarityNum = rand() % 100;
-		if(rarityNum < equipment[i].rarity && equipment[i].a){ //if the rarity num is less than the monsters rarity and its alive
+		if(rarityNum < equipment[i].rarity && equipment[i].a && !equipment[i].isHeld){ //if the rarity num is less than the monsters rarity and its alive
 			/*
 			Object is randomly placed INSIDE one of the open spaces
 			*/
@@ -1895,6 +3020,7 @@ void generateEquipment(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGH
 					equipment[i].pos[X_LOC] = randomX;
 					equipment[i].pos[Y_LOC] = randomY;
 					equipPlaced = true;
+					equipment[i].isHeld = false;
 					numEquip++;
 				}
 			}
@@ -2037,6 +3163,7 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 	int i, j, randX, randY;
 	int moveXdir = 0;
 	int moveYdir = 0;
+	int oldX, oldY;
 	int isErratic = FALSE;
 	int gameStatus = 0;
 	bool gameOver = true;
@@ -2071,14 +3198,14 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 						}
  					}
 				}
-				if(gameOver){
+				if(gameOver || !*num_Mon){
 					gameStatus = 3;
 				}
 				gameOver = true;
 				if(gameStatus == 2){
 					for(i = 0; i < MAX_MONSTERS; i++){
 						heap_remove_min(&h); //remove all of the old monsters from the heap
-						if(!characters[i].u){ //if the monsters aren't unique then bring them back to life for the next level
+						if(!characters[i].u && !characters[i].a){ //if the monsters aren't unique then bring them back to life for the next level
 							characters[i].a = true;
 						}
 					}
@@ -2096,6 +3223,8 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 				roomHeatMapGenerator(PC, roomMap, hardness);
 				wholeHeatMapGenerator(PC, wholeMap, hardness);
 			} else {
+				oldX = p->pos[X_LOC];
+				oldY = p->pos[Y_LOC];
 				if(p->pcLoc[X_LOC] && p->pcLoc[Y_LOC]){
 					inSight = TRUE;
 				}
@@ -2186,7 +3315,7 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 				if((moveYdir || moveXdir) && ((p->tu && hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] < 255) || !hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir])){
 					//Checks if the new space is a monster
 					//if the monster was deleted then don't do anything
-					deleteMonster(dungeon, characters, p->pos[X_LOC] + moveXdir, p->pos[Y_LOC] + moveYdir, num_Mon, 0);
+					deleteMonster(dungeon, characters, p->pos[X_LOC], &moveXdir, p->pos[Y_LOC], &moveYdir, num_Mon, false, equipment);
 					//if the new location is an open room, corridor or staircase then update stats
 					if(hardness[p->pos[Y_LOC] + moveYdir][p->pos[X_LOC] + moveXdir] == 0){ 
 						dungeon[p->pos[Y_LOC]][p->pos[X_LOC]] = p->lv; //replace monster with old room or corridor char
