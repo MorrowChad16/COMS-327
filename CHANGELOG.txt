@@ -96,3 +96,11 @@ Fixed the old mosnter issue
 Added a command cheat sheet for teleport keys
 
 3-26: I got rid of the seg fault when no commands are given
+
+3-31: I added a parsing monster file function
+I added every parse and correct location
+Only issue is assigning values to my string variables in my classes
+Also windows has a '\r' which isn't on Linux
+
+4-1: I fixed the string issue by just creating an array of chars to hold the desc and name
+I added the complete functionality of object parsing very similarly to monster

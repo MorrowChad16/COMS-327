@@ -5,14 +5,15 @@
 
 #include "heap.h"
 
-struct heap_node {
-  heap_node_t *next;
-  heap_node_t *prev;
-  heap_node_t *parent;
-  heap_node_t *child;
-  void *datum;
-  uint32_t degree;
-  uint32_t mark;
+class heap_node {
+	public:
+	  heap_node_t *next;
+	  heap_node_t *prev;
+	  heap_node_t *parent;
+	  heap_node_t *child;
+	  void *datum;
+	  uint32_t degree;
+	  uint32_t mark;
 };
 
 #define swap(a, b) ({    \

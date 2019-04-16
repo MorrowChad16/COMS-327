@@ -10,12 +10,13 @@ extern "C" {
 struct heap_node;
 typedef struct heap_node heap_node_t;
 
-typedef struct heap {
-  heap_node_t *min;
-  uint32_t size;
-  int32_t (*compare)(const void *key, const void *with);
-  void (*datum_delete)(void *);
-} heap_t;
+class heap_t {
+	public: 
+	  heap_node_t *min;
+	  uint32_t size;
+	  int32_t (*compare)(const void *key, const void *with);
+	  void (*datum_delete)(void *);
+};
 
 void heap_init(heap_t *h,
                int32_t (*compare)(const void *key, const void *with),
