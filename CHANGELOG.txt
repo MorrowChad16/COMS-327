@@ -1,0 +1,98 @@
+1-24: Created the game viewing border and area.
+Created random room generator
+
+1-25: Added rooms array to contain all rooms and their traits
+
+1-26: Added 6 or more rooms functionality
+Added a boolean like pre-for loop to check if space was occupied
+Added corridor generation, but I am receiving floating point exception
+Added up and down staircases
+
+1-28: I implemented a way to avoid the floating pointer issue
+
+2-5: I created the read and write functions for the dungeon with every part working properly
+
+2-6: I added Endian fixes
+I added connections to the integer references for key characteristics like number of rooms, etc.
+I added a malloc line for assigning space for our path/directory
+Implemented sub cases within the fuctions if it is loading the dungeon and not creating one
+Failed to implement in stairs
+Failed to implement switch case due to confusion with calling them
+
+2-7: I fixed the stair issue, I was calling the wrong address of the saved file for the coordinates and number
+The switch was implemented with --save, --load, and --load--save
+
+2-9: I created the struct to contain all of the "heat maps"
+I created two functions. One for generating the room heat map and the other for generating the entire map heat map
+
+2-10: I added all of the initializations for the x, y, and cost with the pc being the first non-INT_MAX spot for the heap and algorithm
+
+2-13: My output was not printing the correct cost for each cell
+I added a measure to check if the cell had already been checked
+
+2-14: My room function is able to print a perfect integer depiction of the room heat map, but unable to convert to a char map for an unknown reason
+I added functionality to the whole map function, only changing the added weight and removing the hardness check when adding cost
+
+2-15:I fixed the casting to a char issue by realizing I can store the variables in an int array and then print only what I need with the
+other values being left out. Never changing the internals of the array.
+
+2-19: I added a function to generate monsters with random characteristics
+I added a while loop to generate a set number of monsters
+
+2-20: I created a function that determines if the monster is in the same room as the PC so it remembers its coordinates
+I added the --nummon command to take in the number of monsters the user wants
+
+2-21: I added functionality for default monsters
+I added functionality for the erratic monsters
+
+2-22: I added the functionality for the telepathic monsters
+
+2-23: I added the functionality for the tunnelling monsters
+I added a function that deletes a monster form the character array when it is beaten
+
+2-24: I added the functionality for the intelligent monsters
+I have a segmentation fault when I have multiple monsters, but have yet to investigate the issue
+
+2-26: I added a PC and NPC struct to seperate the characteristics
+I fixed the segmentation fault. Just a logic error when determining move location
+
+2-27: I malloced the character array and free'd it once a monster found the PC
+
+3-1: I added a function with every user input case possibility
+
+3-2: I added a function to print the monster locations relative to the PC
+I added a function to handle generating either loaded or saved dungeon floors, so it can be called when a user moves up or down stairs
+I added the basics to the PC movement and changed the simulateGame function to pause after monster moves and allow the user to move the PC
+
+3-3: I added the capability to view the monsters in a seperate window and scroll up and down if the list is too large
+I added every case for the PC movements
+
+3-4: I correctly implemented the initialization and de init of the ncurses window
+I added a line of code for adding the lv location for the PC
+
+3-5: I added the ability for the PC to move into new corridors created by monsters
+
+3-6: I ran into an issue with generating the new dungeon. It enters the function but doesn't generate the new dungeon
+I also have the issue of printing error messages to the user before clearing. I tried usleep but it didn't work
+
+3-7: I figured out the error messages by having error message values that print after the dungeon
+
+3-10: I spent hours trying to figure out why my new generated dungeon wasn't working, I couldn't figure it out
+
+3-11: I fixed the monster duplicating issue because I was passing in wrong values for my new pc location which through the whole process off
+Still have yet to figure out my new dungeon issue
+
+3-12: I figured out the monster issue. I was generating a the new heat maps with no characters to initiate causing errors
+I figured out an issue where my character wasn't recognizing a monster so it wasn't deleting it. I was passing in the wrong values
+
+3-22: I added the light functionality for the dungeon
+Switched the structs to classes
+Switched the makefile to compile C++
+Switched the .c files to .cpp
+
+3-24: I added the teleport ability
+Noticed a bug where an old monster location isn't refreshed due to my implementation
+Fixed the old mosnter issue
+Added a command cheat sheet for teleport keys
+
+3-26: I got rid of the seg fault when no commands are given
