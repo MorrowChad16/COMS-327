@@ -8,8 +8,11 @@
 #include <unistd.h>
 #include <ncurses.h>
 #include <iostream>
+#include <fstream>
 
 #include "heap.h"
+
+using namespace std;
 
 #define MAX_ROOMS 10
 #define MIN_X_ROOM 4
@@ -29,6 +32,7 @@
 #define Y_LEN 3
 #define NUM_MONSTERS 10
 #define MAX_MONSTERS 21
+#define MAX_EQUIPMENT 20
 #define min(x, y) (x < y ? x : y)
 #define MESSAGES 21
 
@@ -41,46 +45,135 @@ typedef enum action{
 } user_action;
 
 class Cell_t {
-public:
-  heap_node_t *hn;
-  uint8_t pos[2];
-  int32_t cost;
+	public:
+	  heap_node_t *hn;
+	  uint8_t pos[2];
+	  int32_t cost;
 };
 
-// class PC_t{
+class Color {
+public:
+	bool BLACK;
+	bool RED;
+	bool GREEN;
+	bool YELLOW;
+	bool BLUE;
+	bool MAGENTA;
+	bool CYAN;
+	bool WHITE;
+};
+
+class Dice {
+	public: 
+		int base;
+		int dice;
+		int sides;
+};
+
+//implement PC and NPC classes later
+class Character_t {
+	public:
+		Dice s; //speed PC:10, MONST: 5-20
+		int i; //intelligence
+		int t; //telepathy
+		int tu; //tunneling ability
+		int e; //erratic
+		int p; //pass
+		int pu; //pickup
+		int d; //destroy
+		int u; //unique
+		int b; //final boss
+		int pcLoc[2]; //last known pc-location for intelligent monsters
+		char c; //Symbol for the character
+		int a; //tells whether character is alive or not
+		int pos[2]; //position of character
+		int nt; //next turn value for priority queue
+		int sn; //sequence number for priority queue
+		heap_node_t *hn; //heap node for priority queue
+		char lv; //holds last value AKA value it is replacing while still
+		/*
+		0: BLACK
+		1: RED
+		2: GREEN
+		3: YELLOW
+		4: BLUE
+		5: MAGENTA
+		6: CYAN
+		7: WHITE
+		*/
+		Color color; //holds the color of the monster
+		//having issues with using strings so using char array instead
+		char name[78]; //holds the name of the monster
+		char description[1024]; //holds the description of the monster
+		Dice health; //Dice class for health
+		Dice attackDamage; //Dice class for attackDamage
+		int rarity; //odds of spawing the monster
+};
+
+class Items{
+	public:
+		bool weapon;
+		bool offhand;
+		bool ranged;
+		bool armor;
+		bool helmet;
+		bool cloak;
+		bool gloves;
+		bool boots;
+		bool ring;
+		bool amulet;
+		bool light;
+		bool scroll;
+		bool book;
+		bool flask;
+		bool gold;
+		bool ammunition;
+		bool food;
+		bool wand;
+		bool container;
+};
+
+class Equipment{
+	public:
+		char name[78]; //holds the name of the equipment
+		char description[1024]; //holds the description of the monster
+		Items equipment;
+		Color color;
+		Dice HB; //hit bonus
+		Dice DB; //damage bonus
+		Dice DDB; //dodge bonus
+		Dice DFB; //defense bonus
+		Dice weight;
+		Dice SB; //speed bonus
+		Dice SA; //special attribute
+		Dice value;
+		bool status;
+		int rarity;
+};
+
+// class PC_t : public Character_t{
 	// //add pc specific characteristics later
 // };
 
-// class NPC_t {
+// class NPC_t : public Character_t{
 // public:
 	// int i; //intelligence
 	// int t; //telepathy
 	// int tu; //tunneling ability
 	// int e; //erratic
+	// int p; //pass
+	// int pu; //pickup
+	// int d; //destroy
+	// int u; //unique
+	// int b; //final boss
 	// int pcLoc[2]; //last known pc-location for intelligent monsters
-	// int cn; //character number
-	// char lv; //holds last value AKA value it is replacing while still
+	// bool color[8]; //holds the color of the monster
+	// string name; //holds the name of the monster
+	// string description; //holds the description of the monster
+	// Dice_t health; //Dice class for health
+	// Dice_t attackDamage; //Dice class for attackDamage
+	// int rarity; //odds of spawing the monster
 // };
-
-//implement PC and NPC classes later
-class Character_t {
-public:
-	// PC_t *PC; //tells us the character is a pc
-	// NPC_t *NPC; //tells us the character is a pc
-	int s; //speed PC:10, MONST: 5-20
-	int i; //intelligence
-	int t; //telepathy
-	int tu; //tunneling ability
-	int e; //erratic
-	int pcLoc[2]; //last known pc-location for intelligent monsters
-	char c; //Symbol for the character
-	int a; //tells whether character is alive or not
-	int pos[2]; //position of character
-	int nt; //next turn value for priority queue
-	int sn; //sequence number for priority queue
-	heap_node_t *hn; //heap node for priority queue
-	char lv; //holds last value AKA value it is replacing while still
-};
 
 void generateDungeon(char dungeonArray[WINDOW_Y][WINDOW_X], int hardnessArray[GAME_HEIGHT][GAME_WIDTH], char fogDungeon[GAME_HEIGHT][GAME_WIDTH]){
 	int i, j;
@@ -303,7 +396,7 @@ void printDungeon(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GA
 	int i, j;
 	//prints seed
 	int seed = rand();
-	printf("Seed: %d\n", seed);
+	// printf("Seed: %d\n", seed);
 	//prints final array of game area and components
 	for(i = 0; i < WINDOW_Y; i++){
 		for(j = 0; j < WINDOW_X; j++){
@@ -1489,12 +1582,12 @@ void generateMonsters(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT
 			// characters[0].NPC = NULL;
 			characters[0].pos[X_LOC] = PC[X_LOC];
 			characters[0].pos[Y_LOC] = PC[Y_LOC];
-			characters[0].s = 10;
+			characters[0].s.base = 10;
 			characters[0].nt = 0;
 			characters[0].sn = 0;
 		} else {
 			// characters[i].PC = NULL;
-			characters[i].s = 5 + (rand() % 16);
+			characters[i].s.base = 5 + (rand() % 16);
 			characters[i].i = rand() % 2;
 			characters[i].t = rand() % 2;
 			characters[i].tu = rand() % 2;
@@ -1856,7 +1949,7 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 				}
 			}
 			
-			p->nt = p->nt + 1000/p->s;
+			p->nt = p->nt + 1000/p->s.base;
 			heap_insert(&h, p);
 		}
 	}
@@ -1942,6 +2035,752 @@ void init_terminal(void){
 	keypad(stdscr, TRUE); //
 }
 
+void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]){
+	ifstream f(monst_file);
+	string testChar;
+	int i = 1;
+	int j = 0;
+	int maxDesc = 78;
+	string s, s1, s2;
+	bool readingMonst = false;
+	bool readingInfo = false;
+	bool error = false;
+	//checks each step is complete
+	bool compSymb = false;
+	bool compColor = false;
+	bool compName = false;
+	bool compDesc = false;
+	bool compAbil = false;
+	bool compHP = false;
+	bool compAD = false;
+	bool compRar = false;
+	bool compSpeed = false;
+	getline(f, s);
+	s.erase(s.length()-1);
+	if(!s.compare("RLG327 MONSTER DESCRIPTION 1")){ //check the file has the signature to begin reading the data
+		while(f >> s && !error){ //while theres output keep parsing
+			if(!s.compare("BEGIN")){
+				f >> s;
+				if(!s.compare("MONSTER")){
+					f.get();
+					readingMonst = true;
+				}
+			}
+			while(readingMonst){
+				f >> s;
+				if(!s.compare("NAME")){
+					s = "";
+					f.get();
+					getline(f, s);
+					s.erase(s.length()-1);
+					for(int k = 0; k < s.length(); k++){
+						characters[i].name[k] = s[k];
+					}
+					compName = true;
+					cout << characters[i].name << endl;
+				} else if(!s.compare("SYMB")){
+					s = "";
+					f.get();
+					getline(f, s);
+					s.erase(s.length()-1);
+					characters[i].c = s[0];
+					compSymb = true;
+					cout << characters[i].c << endl;	
+				} else if(!s.compare("COLOR")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					readingInfo = true;
+					f.get();
+					while(readingInfo){
+						s2 = (char) f.get();
+						if(!s2.compare(" ") || !s2.compare("\n")){
+							if(!s2.compare("\n")){ //if its a new line then we know were done reading data about the abilities
+								s.erase(s.length()-1);
+								s1.erase(s1.length()-1);
+								readingInfo = false;
+							}
+							if(!s2.compare(" ")){ 
+								s += s2;
+							}
+							if(!s1.compare("BLACK")){
+								compColor = true;
+								characters[i].color.BLACK = true;
+							} else if(!s1.compare("RED")){
+								compColor = true;
+								characters[i].color.RED = true;
+							} else if(!s1.compare("GREEN")){
+								compColor = true;
+								characters[i].color.GREEN = true;
+							} else if(!s1.compare("YELLOW")){
+								compColor = true;
+								characters[i].color.YELLOW = true;
+							} else if(!s1.compare("BLUE")){
+								compColor = true;
+								characters[i].color.MAGENTA = true;
+							} else if(!s1.compare("MAGENTA")){
+								compColor = true;
+								characters[i].color.MAGENTA = true;
+							} else if(!s1.compare("CYAN")){
+								compColor = true;
+								characters[i].color.CYAN = true;
+							} else if(!s1.compare("WHITE")){
+								compColor = true;
+								characters[i].color.WHITE = true;
+							}
+							s1 = ""; //clears the s1 string for the next abilities reading
+						} else {
+							s1 += s2;
+							s += s2;
+						}
+					}
+					cout << s << endl;			
+				} else if(!s.compare("DESC")){
+					getline(f, s); //clears whitespace and new line after DESC
+					s = ""; //clear s to add the complete description
+					readingInfo = true;
+					while(j <= maxDesc && readingInfo){
+						s1 = (char) f.get();
+						if(!s1.compare("\n")){
+							s.erase(s.length()-1);
+							j = 0;
+							testChar = (char) f.get();
+							if(!testChar.compare(".")){
+								readingInfo = false;
+							} else {
+								s1 += testChar;
+							}
+						}
+						if(readingInfo){
+							s += s1;
+							j++;
+						}
+						if(j > maxDesc) {
+							readingInfo = false;
+							error = true;
+						}
+					}
+					compDesc = true;
+					for(int k = 0; k < s.length(); k++){
+						characters[i].description[k] = s[k];
+					}	
+					cout << characters[i].description << endl;
+				} else if(!s.compare("SPEED")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							characters[i].s.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							characters[i].s.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							characters[i].s.sides = stoi(s1);
+							readingInfo = false;
+							compSpeed = true;
+						}
+						
+					}
+					cout << characters[i].s.base << "+" << characters[i].s.dice << "d" << characters[i].s.sides << endl;
+				} else if(!s.compare("DAM")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							characters[i].attackDamage.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							characters[i].attackDamage.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							characters[i].attackDamage.sides = stoi(s1);
+							readingInfo = false;
+							compAD = true;
+						}
+						
+					}
+					cout << characters[i].attackDamage.base << "+" << characters[i].attackDamage.dice << "d" << characters[i].attackDamage.sides << endl;
+				} else if(!s.compare("HP")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							characters[i].health.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							characters[i].health.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							characters[i].health.sides = stoi(s1);
+							readingInfo = false;
+							compHP = true;
+						}
+						
+					}
+					cout << characters[i].health.base << "+" << characters[i].health.dice << "d" << characters[i].health.sides << endl;
+				} else if(!s.compare("ABIL")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					readingInfo = true;
+					f.get();
+					while(readingInfo){
+						s2 = (char) f.get();
+						if(!s2.compare(" ") || !s2.compare("\n")){
+							if(!s2.compare("\n")){ //if its a new line then we know were done reading data about the abilities
+								s.erase(s.length()-1);
+								s1.erase(s1.length()-1);
+								readingInfo = false;
+							}
+							if(!s2.compare(" ")){ 
+								s += s2;
+							}
+							if(!s1.compare("SMART")){
+								compAbil = true;
+								characters[i].i = TRUE;
+							} else if(!s1.compare("TELE")){
+								compAbil = true;
+								characters[i].t = TRUE;
+							} else if(!s1.compare("TUNNEL")){
+								compAbil = true;
+								characters[i].tu = TRUE;
+							} else if(!s1.compare("ERRATIC")){
+								compAbil = true;
+								characters[i].e = TRUE;
+							} else if(!s1.compare("PASS")){
+								compAbil = true;
+								characters[i].p = TRUE;
+							} else if(!s1.compare("PICKUP")){
+								compAbil = true;
+								characters[i].pu = TRUE;
+							} else if(!s1.compare("DESTROY")){
+								compAbil = true;
+								characters[i].d = TRUE;
+							} else if(!s1.compare("UNIQ")){
+								compAbil = true;
+								characters[i].u = TRUE;
+							} else if(!s1.compare("BOSS")){
+								compAbil = true;
+								characters[i].b = TRUE;
+							}
+							s1 = ""; //clears the s1 string for the next abilities reading
+						} else {
+							s1 += s2;
+							s += s2;
+						}
+					}
+					cout << s << endl;
+				} else if(!s.compare("RRTY")){
+					s = "";
+					f.get();
+					getline(f, s);
+					s.erase(s.length()-1);
+					characters[i].rarity = stoi(s);
+					compRar = true;	
+					cout << characters[i].rarity << endl;	
+				} else if(!s.compare("END")){
+					characters[i].a = TRUE;
+					i++;
+					cout << "\n";
+					readingMonst = false;
+				}
+			}
+			if(!compName || !compDesc || !compColor || !compSpeed || !compAbil || !compHP || !compAD || !compSymb || !compRar || error){
+				cout << "Error parsing monster info. Info has been wiped. Please reformat and rerun" << endl;
+				i--;
+				characters[i].a = FALSE; //character is no longer alive because of bad data. I go back with my i to overwrite it or leave it and it isn't pasted in the dungeon
+			}
+			compSymb = compColor = compName = compDesc = compAbil = compHP = compAD = compRar = compSpeed = error = false;
+		}
+	}
+}
+
+void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
+	ifstream f(equip_file);
+	string testChar;
+	int i = 1;
+	int j = 0;
+	int maxDesc = 78;
+	string s, s1, s2;
+	bool readingEquip = false;
+	bool readingInfo = false;
+	bool error = false;
+	//checks each step is complete
+	bool compName = false;
+	bool compType = false;
+	bool compColor = false;
+	bool compWeight = false;
+	bool compHit = false;
+	bool compDam = false;
+	bool compAttr = false;
+	bool compVal = false;
+	bool compDodge = false;
+	bool compDef = false;
+	bool compSpeed = false;
+	bool compArt = false;
+	bool compRar = false;
+	bool compDesc = false;
+	getline(f, s);
+	s.erase(s.length()-1);
+	if(!s.compare("RLG327 OBJECT DESCRIPTION 1")){ //check the file has the signature to begin reading the data
+		while(f >> s && !error){ //while theres output keep parsing
+			if(!s.compare("BEGIN")){
+				f >> s;
+				if(!s.compare("OBJECT")){
+					f.get();
+					readingEquip = true;
+				}
+			}
+			while(readingEquip){
+				f >> s;
+				if(!s.compare("NAME")){
+					s = "";
+					f.get();
+					getline(f, s);
+					s.erase(s.length()-1);
+					for(int k = 0; k < s.length(); k++){
+						equipment[i].name[k] = s[k];
+					}
+					compName = true;
+					cout << equipment[i].name << endl;
+				} else if(!s.compare("TYPE")){
+					s = "";
+					f.get();
+					getline(f, s);
+					s.erase(s.length()-1);
+					if(!s.compare("WEAPON")){
+						equipment[i].equipment.weapon = true;
+					} else if(!s.compare("OFFHAND")){
+						equipment[i].equipment.offhand = true;
+					} else if(!s.compare("RANGED")){
+						equipment[i].equipment.ranged = true;
+					} else if(!s.compare("ARMOR")){
+						equipment[i].equipment.armor = true;
+					} else if(!s.compare("HELMET")){
+						equipment[i].equipment.helmet = true;
+					} else if(!s.compare("CLOAK")){
+						equipment[i].equipment.cloak = true;
+					} else if(!s.compare("GLOVES")){
+						equipment[i].equipment.gloves = true;
+					} else if(!s.compare("BOOTS")){
+						equipment[i].equipment.boots = true;
+					} else if(!s.compare("RING")){
+						equipment[i].equipment.ring = true;
+					} else if(!s.compare("AMULET")){
+						equipment[i].equipment.amulet = true;
+					} else if(!s.compare("LIGHT")){
+						equipment[i].equipment.light = true;
+					} else if(!s.compare("SCROLL")){
+						equipment[i].equipment.scroll = true;
+					} else if(!s.compare("BOOK")){
+						equipment[i].equipment.book = true;
+					} else if(!s.compare("FLASK")){
+						equipment[i].equipment.flask = true;
+					} else if(!s.compare("GOLD")){
+						equipment[i].equipment.gold = true;
+					} else if(!s.compare("AMMUNITION")){
+						equipment[i].equipment.ammunition = true;
+					} else if(!s.compare("FOOD")){
+						equipment[i].equipment.food = true;
+					} else if(!s.compare("WAND")){
+						equipment[i].equipment.wand = true;
+					} else if(!s.compare("CONTAINER")){
+						equipment[i].equipment.container = true;
+					}
+					compType = true;
+					cout << s << endl;
+				} else if(!s.compare("DESC")){
+					getline(f, s); //clears whitespace and new line after DESC
+					s = ""; //clear s to add the complete description
+					readingInfo = true;
+					while(j <= maxDesc && readingInfo){
+						s1 = (char) f.get();
+						if(!s1.compare("\n")){
+							s.erase(s.length()-1);
+							j = 0;
+							testChar = (char) f.get();
+							if(!testChar.compare(".")){
+								readingInfo = false;
+							} else {
+								s1 += testChar;
+							}
+						}
+						if(readingInfo){
+							s += s1;
+							j++;
+						}
+						if(j > maxDesc) {
+							readingInfo = false;
+							error = true;
+						}
+					}
+					compDesc = true;
+					for(int k = 0; k < s.length(); k++){
+						equipment[i].description[k] = s[k];
+					}	
+					cout << equipment[i].description << endl;
+				} else if(!s.compare("COLOR")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					readingInfo = true;
+					f.get();
+					while(readingInfo){
+						s2 = (char) f.get();
+						if(!s2.compare(" ") || !s2.compare("\n")){
+							if(!s2.compare("\n")){ //if its a new line then we know were done reading data about the abilities
+								s.erase(s.length()-1);
+								s1.erase(s1.length()-1);
+								readingInfo = false;
+							}
+							if(!s2.compare(" ")){ 
+								s += s2;
+							}
+							if(!s1.compare("BLACK")){
+								compColor = true;
+								equipment[i].color.BLACK = true;
+							} else if(!s1.compare("RED")){
+								compColor = true;
+								equipment[i].color.RED = true;
+							} else if(!s1.compare("GREEN")){
+								compColor = true;
+								equipment[i].color.GREEN = true;
+							} else if(!s1.compare("YELLOW")){
+								compColor = true;
+								equipment[i].color.YELLOW = true;
+							} else if(!s1.compare("BLUE")){
+								compColor = true;
+								equipment[i].color.MAGENTA = true;
+							} else if(!s1.compare("MAGENTA")){
+								compColor = true;
+								equipment[i].color.MAGENTA = true;
+							} else if(!s1.compare("CYAN")){
+								compColor = true;
+								equipment[i].color.CYAN = true;
+							} else if(!s1.compare("WHITE")){
+								compColor = true;
+								equipment[i].color.WHITE = true;
+							}
+							s1 = ""; //clears the s1 string for the next abilities reading
+						} else {
+							s1 += s2;
+							s += s2;
+						}
+					}
+					cout << s << endl;			
+				} else if(!s.compare("WEIGHT")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].weight.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].weight.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].weight.sides = stoi(s1);
+							readingInfo = false;
+							compWeight = true;
+						}
+						
+					}
+					cout << equipment[i].weight.base << "+" << equipment[i].weight.dice << "d" << equipment[i].weight.sides << endl;
+				} else if(!s.compare("HIT")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].HB.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].HB.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].HB.sides = stoi(s1);
+							readingInfo = false;
+							compHit = true;
+						}
+						
+					}
+					cout << equipment[i].HB.base << "+" << equipment[i].HB.dice << "d" << equipment[i].HB.sides << endl;
+				} else if(!s.compare("DAM")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].DB.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].DB.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].DB.sides = stoi(s1);
+							readingInfo = false;
+							compDam = true;
+						}
+						
+					}
+					cout << equipment[i].DB.base << "+" << equipment[i].DB.dice << "d" << equipment[i].DB.sides << endl;
+				} else if(!s.compare("ATTR")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].SA.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].SA.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].SA.sides = stoi(s1);
+							readingInfo = false;
+							compAttr = true;
+						}
+						
+					}
+					cout << equipment[i].SA.base << "+" << equipment[i].SA.dice << "d" << equipment[i].SA.sides << endl;
+				} else if(!s.compare("VAL")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].value.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].value.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].value.sides = stoi(s1);
+							readingInfo = false;
+							compVal = true;
+						}
+						
+					}
+					cout << equipment[i].value.base << "+" << equipment[i].value.dice << "d" << equipment[i].value.sides << endl;
+				} else if(!s.compare("DODGE")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].DDB.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].DDB.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].DDB.sides = stoi(s1);
+							readingInfo = false;
+							compDodge = true;
+						}
+						
+					}
+					cout << equipment[i].DDB.base << "+" << equipment[i].DDB.dice << "d" << equipment[i].DDB.sides << endl;
+				} else if(!s.compare("DEF")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].DFB.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].DFB.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].DFB.sides = stoi(s1);
+							readingInfo = false;
+							compDef = true;
+						}
+						
+					}
+					cout << equipment[i].DFB.base << "+" << equipment[i].DFB.dice << "d" << equipment[i].DFB.sides << endl;
+				} else if(!s.compare("SPEED")){
+					s = "";
+					s1 = "";
+					s2 = "";
+					f.get();
+					readingInfo = true;
+					while(readingInfo){
+						s2 = (char) f.get();
+						s1 += s2;
+						s += s2;
+						if(!s2.compare("+")){
+							s1.erase(s1.length()-1);
+							equipment[i].SB.base = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("d")){
+							s1.erase(s1.length()-1);
+							equipment[i].SB.dice = stoi(s1);
+							s1 = "";
+						} else if(!s2.compare("\n")){
+							s.erase(s.length()-1);
+							s.erase(s.length()-1);
+							s1.erase(s1.length()-1);
+							s1.erase(s1.length()-1);
+							equipment[i].SB.sides = stoi(s1);
+							readingInfo = false;
+							compSpeed = true;
+						}
+						
+					}
+					cout << equipment[i].SB.base << "+" << equipment[i].SB.dice << "d" << equipment[i].SB.sides << endl;
+				} else if(!s.compare("RRTY")){
+					s = "";
+					f.get();
+					getline(f, s);
+					s.erase(s.length()-1);
+					equipment[i].rarity = stoi(s);
+					compRar = true;	
+					cout << equipment[i].rarity << endl;	
+				} else if(!s.compare("ART")){
+					s = "";
+					f.get();
+					getline(f, s);
+					s.erase(s.length()-1);
+					if(!s.compare("FALSE")){
+						equipment[i].status = false;
+					} else {
+						equipment[i].status = true;
+					}
+					compArt = true;	
+					cout << s << endl;	
+				} else if(!s.compare("END")){
+					i++;
+					cout << "\n";
+					readingEquip = false;
+				}
+			}
+			if(!compName || !compType || !compColor || !compWeight || !compHit || !compDam || !compAttr || !compVal || !compDodge ||
+				!compDef || !compSpeed || !compArt || !compRar || !compDesc || error){
+				cout << "Error parsing object info. Info has been wiped. Please reformat and rerun" << endl;
+				i--;
+			}
+			compName = compType = compColor = compWeight = compHit = compDam = compAttr = compVal = compDodge = compDef = compSpeed = compArt = compRar = compDesc = error = false;
+		}
+	}
+}
+
 int main(int argc, char *argv[]){
 	int number_of_rooms = 0; //holds values for number of rooms generated in the dungeon
 	int number_of_upstairs = 0; //holds values for number of upcases generated in the dungeon
@@ -1997,6 +2836,8 @@ int main(int argc, char *argv[]){
 	
 	// Character_t characters[MAX_MONSTERS];
 	Character_t *characters = (Character_t *) malloc(MAX_MONSTERS * sizeof(Character_t));
+	
+	Equipment *equipment = (Equipment *) malloc(MAX_EQUIPMENT * sizeof(Equipment));
 	/*
 	Array containing every monster in our dungeon
 	*/
@@ -2010,9 +2851,27 @@ int main(int argc, char *argv[]){
 	directory = (char *) malloc(strlen(home) + strlen("/.rlg327/dungeon") + 1);
 	strcpy(directory, home);
 	strcat(directory, "/.rlg327/dungeon");
-	*/		
+	*/	
+
+	/*
+	char *home = getenv("HOME");
+	char *monst_file;
+	directory = (char *) malloc(strlen(home) + strlen("/.rlg327/monster_desc") + 1);
+	strcpy(monst_file, home);
+	strcat(monst_file, "/.rlg327/monster_desc");	
+	*/
+	
+	/*
+	char *home = getenv("HOME");
+	char *obj_file;
+	directory = (char *) malloc(strlen(home) + strlen("/.rlg327/object_desc") + 1);
+	strcpy(obj_file, home);
+	strcat(obj_file, "/.rlg327/object_desc");	
+	*/
 			
 	char *directory = (char *) "C:/Users/morro/.rlg327/dungeon.txt";
+	char *monst_file = (char *) "C:/Users/morro/.rlg327/monster_desc.txt";
+	char *obj_file = (char *) "C:/Users/morro/.rlg327/object_desc.txt";
 	// char *directory = "C:/Users/morro/.rlg327/01.rlg327";
 	// char *directory = "/home/student/.rlg327/01.rlg327";
 	
@@ -2037,9 +2896,6 @@ int main(int argc, char *argv[]){
 				num_Mon = MAX_MONSTERS - 1;
 			}
 			action = num_mon;
-		} else{
-			printf("Please enter: <--save, --load, --load--save> to perforam an action");
-			return -1;
 		}
 
 		switch(action){
@@ -2070,7 +2926,10 @@ int main(int argc, char *argv[]){
 				break;
 		}
 	} else {
-		printf("Please enter: <--save, --load, --load--save> after './game' to perform an action");
+		// cout << "Please enter: <--save, --load, --load--save> after './game' to perform an action";
+		parseMonstFile(monst_file, characters);
+		//parseObjFile(obj_file, equipment);
+		free(characters);
 	}
 	return 0;
 }

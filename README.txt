@@ -1,11 +1,13 @@
-This assignment builds on previous assignments
+This program builds on previous HW assignments
 
-Code is ported to C++
-Structs are changed to classes
-.c files are now .cpp
+It adds parsing monster and object file capabilities
 
-Two new added functions for the PC.
-'t' allows the user to choose a new position with the same keys as normally moving or
-'r' randomly chooses a location for you
+When parsing the data will be allocated to the correct parts of the characters and objects which are stored in an array of their
+respective types
 
-'light' rendering added to display only the areas that the PC has seen and only updates the foggy dungeon when it the vicinity (5x5) region
+It will print the values that were read and stored
+
+When using WINDOWS keep the s.erase() functions, if on LINUX comment them out.
+WINDOWS has a '/r' at the end of the line as well as '/n' the erase function removes this for comparison reasons
+
+The way main() is set up, don't enter any command after './game' and it will print the monster and object file info
