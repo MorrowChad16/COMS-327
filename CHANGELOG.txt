@@ -104,3 +104,10 @@ Also windows has a '\r' which isn't on Linux
 
 4-1: I fixed the string issue by just creating an array of chars to hold the desc and name
 I added the complete functionality of object parsing very similarly to monster
+
+4-7: I customized the mosnter placer to accommodate the new system
+I added an object placer to place at least 10 objects
+I changed around a few functions in simulateGame to refresh the character and object list for going up and down stairs
+I added an alive and lv variable for objects that act the exact same in characters
+I changed around a few "boolean" like integers to be actual booleans in C++
+I added color to the characters

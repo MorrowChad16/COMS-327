@@ -30,11 +30,12 @@ using namespace std;
 #define Y_LOC 1
 #define X_LEN 2
 #define Y_LEN 3
-#define NUM_MONSTERS 10
+#define NUM_MONSTERS 100
 #define MAX_MONSTERS 21
-#define MAX_EQUIPMENT 20
+#define MAX_EQUIPMENT 100
 #define min(x, y) (x < y ? x : y)
 #define MESSAGES 21
+
 
 //defines user actions when running game.c
 typedef enum action{
@@ -73,7 +74,7 @@ class Dice {
 //implement PC and NPC classes later
 class Character_t {
 	public:
-		Dice s; //speed PC:10, MONST: 5-20
+		int s; //speed PC:10, MONST: 5-20
 		int i; //intelligence
 		int t; //telepathy
 		int tu; //tunneling ability
@@ -85,7 +86,7 @@ class Character_t {
 		int b; //final boss
 		int pcLoc[2]; //last known pc-location for intelligent monsters
 		char c; //Symbol for the character
-		int a; //tells whether character is alive or not
+		bool a; //tells whether character is alive or not
 		int pos[2]; //position of character
 		int nt; //next turn value for priority queue
 		int sn; //sequence number for priority queue
@@ -105,7 +106,7 @@ class Character_t {
 		//having issues with using strings so using char array instead
 		char name[78]; //holds the name of the monster
 		char description[1024]; //holds the description of the monster
-		Dice health; //Dice class for health
+		int health; //Dice class for health
 		Dice attackDamage; //Dice class for attackDamage
 		int rarity; //odds of spawing the monster
 };
@@ -139,16 +140,20 @@ class Equipment{
 		char description[1024]; //holds the description of the monster
 		Items equipment;
 		Color color;
-		Dice HB; //hit bonus
+		int HB; //hit bonus
 		Dice DB; //damage bonus
-		Dice DDB; //dodge bonus
-		Dice DFB; //defense bonus
-		Dice weight;
-		Dice SB; //speed bonus
-		Dice SA; //special attribute
-		Dice value;
+		int DDB; //dodge bonus
+		int DFB; //defense bonus
+		int weight;
+		int SB; //speed bonus
+		int SA; //special attribute
+		int value;
 		bool status;
 		int rarity;
+		char lv; //holds the dungeon character
+		bool a; //tells whether the equipment is alive or not/can be placed or not
+		int pos[2]; //position of equipment
+		char c; //holds the equipment character
 };
 
 // class PC_t : public Character_t{
@@ -994,8 +999,9 @@ int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_M
 		for(i = 0; i < MAX_MONSTERS; i++){ //loops through all our characters
 			if(newYpos == characters[i].pos[Y_LOC] && newXpos == characters[i].pos[X_LOC] && characters[i].a){ //checks if the new position is occupied by a monster
 				dungeon[newYpos][newXpos] = characters[i].lv; //Replace the pos with the dungeon char
-				characters[i].a = FALSE;
-				*num_Mon -= 1;
+				characters[i].a = false;
+				characters[i].pos[X_LOC] = 0;
+				characters[i].pos[Y_LOC] = 0;
 				return 1;
 			}
 		}
@@ -1003,8 +1009,9 @@ int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_M
 		for(i = 1; i < MAX_MONSTERS; i++){ //loops through all our characters
 			if(newYpos == characters[i].pos[Y_LOC] && newXpos == characters[i].pos[X_LOC] && characters[i].a){ //checks if the new position is occupied by a monster
 				dungeon[newYpos][newXpos] = characters[i].lv; //Replace the pos with the dungeon char
-				characters[i].a = FALSE;
-				*num_Mon -= 1;
+				characters[i].a = false;
+				characters[i].pos[X_LOC] = 0;
+				characters[i].pos[Y_LOC] = 0;
 				return 1;
 			}
 		}
@@ -1022,7 +1029,6 @@ void generateNewFloor(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT
 		*number_of_downstairs = 0;
 		*number_of_upstairs = 0;
 		hardness[0][0] = 0;
-		*numMon = 1 + rand() % 19;
 	}
 	generateDungeon(dungeon, hardness, fogDungeon);
 	generateRooms(rooms, dungeon, hardness, number_of_rooms);
@@ -1041,11 +1047,12 @@ void generateNewFloor(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT
 void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GAME_WIDTH], 
 						int wholeMap[GAME_HEIGHT][GAME_WIDTH], int PC[2], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], 
 						int *number_of_upstairs, int *number_of_downstairs, int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms, int *gameStatus,
-						char fogDungeon[GAME_HEIGHT][GAME_WIDTH]){
-	int row, col, i, cmnd, randX, randY;
+						char fogDungeon[GAME_HEIGHT][GAME_WIDTH], int *num_Equip, Equipment equipment[MAX_EQUIPMENT]){
+	int row, col, i, cmnd, randX, randY, j, maxLoop;
 	int errorMessage = -1;
 	int key;
 	int isError = 0;
+	
 	
 	if(errorMessage == 3){
 		CMD:;
@@ -1063,16 +1070,100 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 	refresh();
 	clear();
 	//updates fog map
-	for(col = characters[0].pos[Y_LOC] - 2; col < characters[0].pos[Y_LOC] + 3; col++){
-		for(row = characters[0].pos[X_LOC] - 2; row < characters[0].pos[X_LOC] + 3; row++){
-			fogDungeon[col][row] = dungeon[col][row];
+	for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
+		for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
+			fogDungeon[row][col] = dungeon[row][col];
 		}
 	}
 	
 	//Pastes the fog dungeon
-	for(col = 0; col < GAME_HEIGHT; col++){
-		for(row = 0; row < GAME_WIDTH; row++){
-			mvaddch(col, row, fogDungeon[col][row]);
+	for(row = 0; row < GAME_HEIGHT; row++){
+		for(col = 0; col < GAME_WIDTH; col++){
+			if(fogDungeon[row][col] == '.' || fogDungeon[row][col] == '#' || fogDungeon[row][col] == ' ' || fogDungeon[row][col] == '|' 
+				|| fogDungeon[row][col] == '-' || fogDungeon[row][col] == '@' || fogDungeon[row][col] == '<' || fogDungeon[row][col] == '>'){ //always white
+				mvaddch(row, col, fogDungeon[row][col]);
+			} else {
+				j = 0;
+				//Could use macro here to speed up but forgot how to and I'm lazy
+				if(*num_Mon > *num_Equip){
+					maxLoop = *num_Mon;
+				} else {
+					maxLoop = *num_Equip;
+				}
+				//REALLY LENGTHY WAY OF DOING THIS, HAVE TO BE AN EASIER TO WAY TO QUICKLY LOOK UP WHAT COLOR AND CHARACTER IS THERE
+				while(j < maxLoop){
+					if(characters[j].pos[Y_LOC] == row && characters[j].pos[X_LOC] == col && characters[j].a){ //generates monsters with colors
+						if(characters[j].color.BLACK){
+							attron(COLOR_PAIR(COLOR_BLACK));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_BLACK));
+						} else if(characters[j].color.RED){
+							attron(COLOR_PAIR(COLOR_RED));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_RED));
+						} else if(characters[j].color.GREEN){
+							attron(COLOR_PAIR(COLOR_GREEN));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_GREEN));
+						} else if(characters[j].color.YELLOW){
+							attron(COLOR_PAIR(COLOR_YELLOW));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_YELLOW));
+						} else if(characters[j].color.BLUE){
+							attron(COLOR_PAIR(COLOR_BLUE));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_BLUE));
+						} else if(characters[j].color.MAGENTA){
+							attron(COLOR_PAIR(COLOR_MAGENTA));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_MAGENTA));
+						} else if(characters[j].color.CYAN){
+							attron(COLOR_PAIR(COLOR_CYAN));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_CYAN));
+						} else if(characters[j].color.WHITE){
+							attron(COLOR_PAIR(COLOR_WHITE));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_WHITE));
+						}
+					} else if(equipment[j].pos[Y_LOC] == row && equipment[j].pos[X_LOC] == col && equipment[j].a){ //generates equipment with colors
+						if(equipment[j].color.BLACK){
+							attron(COLOR_PAIR(COLOR_BLACK));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_BLACK));
+						} else if(equipment[j].color.RED){
+							attron(COLOR_PAIR(COLOR_RED));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_RED));
+						} else if(equipment[j].color.GREEN){
+							attron(COLOR_PAIR(COLOR_GREEN));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_GREEN));
+						} else if(equipment[j].color.YELLOW){
+							attron(COLOR_PAIR(COLOR_YELLOW));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_YELLOW));
+						} else if(equipment[j].color.BLUE){
+							attron(COLOR_PAIR(COLOR_BLUE));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_BLUE));
+						} else if(equipment[j].color.MAGENTA){
+							attron(COLOR_PAIR(COLOR_MAGENTA));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_MAGENTA));
+						} else if(equipment[j].color.CYAN){
+							attron(COLOR_PAIR(COLOR_CYAN));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_CYAN));
+						} else if(equipment[j].color.WHITE){
+							attron(COLOR_PAIR(COLOR_WHITE));
+							mvaddch(row, col, fogDungeon[row][col]);
+							attroff(COLOR_PAIR(COLOR_WHITE));
+						} 
+					}
+					j++;
+				}
+			}
 		}
 	}
 
@@ -1312,9 +1403,93 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			w = newwin(24, 80, 0, 0);
 			wrefresh(w);
 			clear();
-			for(col = 0; col < GAME_HEIGHT; col++){
-				for(row = 0; row < GAME_WIDTH; row++){
-					mvaddch(col, row, dungeon[col][row]);
+			for(row = 0; row < GAME_HEIGHT; row++){
+				for(col = 0; col < GAME_WIDTH; col++){
+					if(dungeon[row][col] == '.' || dungeon[row][col] == '#' || dungeon[row][col] == ' ' || dungeon[row][col] == '|' 
+						|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>'){ //always white
+						mvaddch(row, col, dungeon[row][col]);
+					} else {
+						j = 0;
+						//Could use macro here to speed up but forgot how to and I'm lazy
+						if(*num_Mon > *num_Equip){
+							maxLoop = *num_Mon;
+						} else {
+							maxLoop = *num_Equip;
+						}
+						//REALLY LENGTHY WAY OF DOING THIS, HAVE TO BE AN EASIER TO WAY TO QUICKLY LOOK UP WHAT COLOR AND CHARACTER IS THERE
+						while(j < maxLoop){
+							if(characters[j].pos[Y_LOC] == row && characters[j].pos[X_LOC] == col && characters[j].a){ //generates monsters with colors
+								if(characters[j].color.BLACK){
+									attron(COLOR_PAIR(COLOR_BLACK));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_BLACK));
+								} else if(characters[j].color.RED){
+									attron(COLOR_PAIR(COLOR_RED));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_RED));
+								} else if(characters[j].color.GREEN){
+									attron(COLOR_PAIR(COLOR_GREEN));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_GREEN));
+								} else if(characters[j].color.YELLOW){
+									attron(COLOR_PAIR(COLOR_YELLOW));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_YELLOW));
+								} else if(characters[j].color.BLUE){
+									attron(COLOR_PAIR(COLOR_BLUE));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_BLUE));
+								} else if(characters[j].color.MAGENTA){
+									attron(COLOR_PAIR(COLOR_MAGENTA));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_MAGENTA));
+								} else if(characters[j].color.CYAN){
+									attron(COLOR_PAIR(COLOR_CYAN));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_CYAN));
+								} else if(characters[j].color.WHITE){
+									attron(COLOR_PAIR(COLOR_WHITE));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_WHITE));
+								}
+							} else if(equipment[j].pos[Y_LOC] == row && equipment[j].pos[X_LOC] == col && equipment[j].a){ //generates equipment with colors
+								if(equipment[j].color.BLACK){
+									attron(COLOR_PAIR(COLOR_BLACK));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_BLACK));
+								} else if(equipment[j].color.RED){
+									attron(COLOR_PAIR(COLOR_RED));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_RED));
+								} else if(equipment[j].color.GREEN){
+									attron(COLOR_PAIR(COLOR_GREEN));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_GREEN));
+								} else if(equipment[j].color.YELLOW){
+									attron(COLOR_PAIR(COLOR_YELLOW));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_YELLOW));
+								} else if(equipment[j].color.BLUE){
+									attron(COLOR_PAIR(COLOR_BLUE));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_BLUE));
+								} else if(equipment[j].color.MAGENTA){
+									attron(COLOR_PAIR(COLOR_MAGENTA));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_MAGENTA));
+								} else if(equipment[j].color.CYAN){
+									attron(COLOR_PAIR(COLOR_CYAN));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_CYAN));
+								} else if(equipment[j].color.WHITE){
+									attron(COLOR_PAIR(COLOR_WHITE));
+									mvaddch(row, col, dungeon[row][col]);
+									attroff(COLOR_PAIR(COLOR_WHITE));
+								} 
+							}
+							j++;
+						}
+					}
 				}
 			}
 			mvprintw(MESSAGES, 0, "PRESS ANY KEY TO EXIT AND GO TO NEXT TURN\n");
@@ -1334,12 +1509,96 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			BSC:;
 			refresh();
 			clear();
-			for(col = 0; col < GAME_HEIGHT; col++){
-				for(row = 0; row < GAME_WIDTH; row++){
-					if(col == characters[0].pos[Y_LOC] && row == characters[0].pos[X_LOC]){ //print '*' for the place the user plans on moving
-						mvaddch(col, row, '*');
+			for(row = 0; row < GAME_HEIGHT; row++){
+				for(col = 0; col < GAME_WIDTH; col++){
+					if(row == characters[0].pos[Y_LOC] && col == characters[0].pos[X_LOC]){ //print '*' for the place the user plans on moving
+						mvaddch(row, col, '*');
 					} else { //print normal dungeon
-						mvaddch(col, row, dungeon[col][row]);
+						if(dungeon[row][col] == '.' || dungeon[row][col] == '#' || dungeon[row][col] == ' ' || dungeon[row][col] == '|' 
+						|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>'){ //always white
+						mvaddch(row, col, dungeon[row][col]);
+						} else {
+							j = 0;
+							//Could use macro here to speed up but forgot how to and I'm lazy
+							if(*num_Mon > *num_Equip){
+								maxLoop = *num_Mon;
+							} else {
+								maxLoop = *num_Equip;
+							}
+							//REALLY LENGTHY WAY OF DOING THIS, HAVE TO BE AN EASIER TO WAY TO QUICKLY LOOK UP WHAT COLOR AND CHARACTER IS THERE
+							while(j < maxLoop){
+								if(characters[j].pos[Y_LOC] == row && characters[j].pos[X_LOC] == col && characters[j].a){ //generates monsters with colors
+									if(characters[j].color.BLACK){
+										attron(COLOR_PAIR(COLOR_BLACK));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLACK));
+									} else if(characters[j].color.RED){
+										attron(COLOR_PAIR(COLOR_RED));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_RED));
+									} else if(characters[j].color.GREEN){
+										attron(COLOR_PAIR(COLOR_GREEN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_GREEN));
+									} else if(characters[j].color.YELLOW){
+										attron(COLOR_PAIR(COLOR_YELLOW));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_YELLOW));
+									} else if(characters[j].color.BLUE){
+										attron(COLOR_PAIR(COLOR_BLUE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLUE));
+									} else if(characters[j].color.MAGENTA){
+										attron(COLOR_PAIR(COLOR_MAGENTA));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_MAGENTA));
+									} else if(characters[j].color.CYAN){
+										attron(COLOR_PAIR(COLOR_CYAN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_CYAN));
+									} else if(characters[j].color.WHITE){
+										attron(COLOR_PAIR(COLOR_WHITE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_WHITE));
+									}
+								} else if(equipment[j].pos[Y_LOC] == row && equipment[j].pos[X_LOC] == col && equipment[j].a){ //generates equipment with colors
+									if(equipment[j].color.BLACK){
+										attron(COLOR_PAIR(COLOR_BLACK));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLACK));
+									} else if(equipment[j].color.RED){
+										attron(COLOR_PAIR(COLOR_RED));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_RED));
+									} else if(equipment[j].color.GREEN){
+										attron(COLOR_PAIR(COLOR_GREEN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_GREEN));
+									} else if(equipment[j].color.YELLOW){
+										attron(COLOR_PAIR(COLOR_YELLOW));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_YELLOW));
+									} else if(equipment[j].color.BLUE){
+										attron(COLOR_PAIR(COLOR_BLUE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLUE));
+									} else if(equipment[j].color.MAGENTA){
+										attron(COLOR_PAIR(COLOR_MAGENTA));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_MAGENTA));
+									} else if(equipment[j].color.CYAN){
+										attron(COLOR_PAIR(COLOR_CYAN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_CYAN));
+									} else if(equipment[j].color.WHITE){
+										attron(COLOR_PAIR(COLOR_WHITE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_WHITE));
+									} 
+								}
+								j++;
+							}
+						}
 					}
 				}
 			}
@@ -1494,9 +1753,9 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 					}
 					dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //put PC in dungeon
 					//updates fog map for user
-					for(col = characters[0].pos[Y_LOC] - 2; col < characters[0].pos[Y_LOC] + 3; col++){
-						for(row = characters[0].pos[X_LOC] - 2; row < characters[0].pos[X_LOC] + 3; row++){
-							fogDungeon[col][row] = dungeon[col][row];
+					for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
+						for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
+							fogDungeon[row][col] = dungeon[row][col];
 						}
 					}
 					break;
@@ -1505,9 +1764,9 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 					characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //update PC's lv
 					dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update the dungeon with the new PC location
 					//updates fog map for user
-					for(col = characters[0].pos[Y_LOC] - 2; col < characters[0].pos[Y_LOC] + 3; col++){
-						for(row = characters[0].pos[X_LOC] - 2; row < characters[0].pos[X_LOC] + 3; row++){
-							fogDungeon[col][row] = dungeon[col][row];
+					for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
+						for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
+							fogDungeon[row][col] = dungeon[row][col];
 						}
 					}
 					break;
@@ -1568,12 +1827,9 @@ void inSight(char dungeon[WINDOW_Y][WINDOW_X], Character_t *character, int rooms
 void generateMonsters(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int PC[2], 
 					int *num_Mon, Character_t characters[MAX_MONSTERS], int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms){
 	int i = 0;
+	int randomX, randomY;
+	bool monsterPlaced = false;
 	while(i <= *num_Mon){ //generate all the monsters and their characteristics
-		int randomX, randomY;
-		int monsterPlaced = FALSE;
-		
-		characters[i].sn = i;
-		characters[i].a = TRUE;
 		/*
 		PC is set not to move AT ALL
 		*/
@@ -1582,74 +1838,72 @@ void generateMonsters(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT
 			// characters[0].NPC = NULL;
 			characters[0].pos[X_LOC] = PC[X_LOC];
 			characters[0].pos[Y_LOC] = PC[Y_LOC];
-			characters[0].s.base = 10;
+			characters[0].s = 10;
 			characters[0].nt = 0;
 			characters[0].sn = 0;
+			characters[i].a = true;
 		} else {
-			// characters[i].PC = NULL;
-			characters[i].s.base = 5 + (rand() % 16);
-			characters[i].i = rand() % 2;
-			characters[i].t = rand() % 2;
-			characters[i].tu = rand() % 2;
-			characters[i].e = rand() % 2;
-			characters[i].nt = 0;
-			
-			if(i != 0){
+			int rarityNum = rand() % 100;
+			if(rarityNum < characters[i].rarity && characters[i].a){ //if the rarity num is less than the monsters rarity and its alive
+				// characters[i].PC = NULL;
+				characters[i].nt = 0;
+				characters[i].sn = i;
 				/*
-				Hexadecimal format of the characters characteristics
+				Monster is placed randomly INSIDE one of the open spaces
 				*/
-				if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == FALSE){
-					characters[i].c = '0';
-				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == FALSE){
-					characters[i].c = '1';
-				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == FALSE){
-					characters[i].c = '2';
-				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == FALSE){
-					characters[i].c = '3';
-				} else if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == FALSE){
-					characters[i].c = '4';
-				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == FALSE){
-					characters[i].c = '5';
-				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == FALSE){
-					characters[i].c = '6';
-				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == FALSE){
-					characters[i].c = '7';
-				} else if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == TRUE){
-					characters[i].c = '8';
-				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == FALSE && characters[i].e == TRUE){
-					characters[i].c = '9';
-				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == TRUE){
-					characters[i].c = 'a';
-				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == FALSE && characters[i].e == TRUE){
-					characters[i].c = 'b';
-				} else if(characters[i].i == FALSE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == TRUE){
-					characters[i].c = 'c';
-				} else if(characters[i].i == TRUE && characters[i].t == FALSE && characters[i].tu == TRUE && characters[i].e == TRUE){
-					characters[i].c = 'd';
-				} else if(characters[i].i == FALSE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == TRUE){
-					characters[i].c = 'e';
-				} else if(characters[i].i == TRUE && characters[i].t == TRUE && characters[i].tu == TRUE && characters[i].e == TRUE){
-					characters[i].c = 'f';
+				while(!monsterPlaced){
+					randomY = 1 + rand() % GAME_HEIGHT - 1;
+					randomX = 1 + rand() % GAME_WIDTH - 2;
+					if(!hardness[randomY][randomX] && ((dungeon[randomY][randomX] == '.' || dungeon[randomY][randomX] == '#'))){	
+						characters[i].lv = dungeon[randomY][randomX];
+						dungeon[randomY][randomX] = characters[i].c;
+						characters[i].pos[X_LOC] = randomX;
+						characters[i].pos[Y_LOC] = randomY;
+						monsterPlaced = true;
+						characters[i].a = true;
+					}
 				}
+				monsterPlaced = false;
+				inSight(dungeon, characters, rooms, number_of_rooms, PC); //check if the monster can see the PC OR PC is in a room
+			} else {
+				characters[i].a = false;
 			}
-			
-			/*
-			Monster is placed randomly INSIDE one of the open spaces
-			*/
-			while(!monsterPlaced){
-				randomY = 1 + rand() % GAME_HEIGHT - 1;
-				randomX = 1 + rand() % GAME_WIDTH - 2;
-				if(!hardness[randomY][randomX] && (dungeon[randomY][randomX] == '.' || dungeon[randomY][randomX] == '#')){	
-					characters[i].lv = dungeon[randomY][randomX];
-					dungeon[randomY][randomX] = characters[i].c;
-					characters[i].pos[0] = randomX;
-					characters[i].pos[1] = randomY;
-					monsterPlaced = TRUE;
-				}
-			}
-			inSight(dungeon, characters, rooms, number_of_rooms, PC); //check if the monster can see the PC OR PC is in a room
 		}
 		i++;
+	}
+}
+
+void generateEquipment(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int *num_Equip, 
+						Equipment equipment[MAX_MONSTERS]){
+	int i = 0;
+	int	numEquip = 0;
+	int minEquip = 10;
+	int randomX, randomY;
+	bool equipPlaced = false;
+	while(i <= *num_Equip && numEquip < minEquip){ //generate all the equipment and place them if rarity allows
+		int rarityNum = rand() % 100;
+		if(rarityNum < equipment[i].rarity && equipment[i].a){ //if the rarity num is less than the monsters rarity and its alive
+			/*
+			Object is randomly placed INSIDE one of the open spaces
+			*/
+			while(!equipPlaced){
+				randomY = 1 + rand() % GAME_HEIGHT - 1;
+				randomX = 1 + rand() % GAME_WIDTH - 2;
+				if(!hardness[randomY][randomX] && ((dungeon[randomY][randomX] == '.' || dungeon[randomY][randomX] == '#'))){	
+					equipment[i].lv = dungeon[randomY][randomX];
+					dungeon[randomY][randomX] = equipment[i].c;
+					equipment[i].pos[X_LOC] = randomX;
+					equipment[i].pos[Y_LOC] = randomY;
+					equipPlaced = true;
+					numEquip++;
+				}
+			}
+			equipPlaced = false;
+		}
+		i++;
+		if(i == *num_Equip && numEquip < minEquip){ //looped through once, go through again to get at least 10 items
+			i = 0;
+		}
 	}
 }
 
@@ -1776,7 +2030,7 @@ static int32_t compare_characters(const void *c1, const void *c2) {
 void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT][GAME_WIDTH], int roomMap[GAME_HEIGHT][GAME_WIDTH], 
 						int wholeMap[GAME_HEIGHT][GAME_WIDTH], int PC[2], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], 
 						int *number_of_upstairs, int *number_of_downstairs, int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms,
-						char fogDungeon[GAME_HEIGHT][GAME_WIDTH]){
+						char fogDungeon[GAME_HEIGHT][GAME_WIDTH], int *num_Equip, Equipment equipment[MAX_EQUIPMENT]){
 	heap_t h;
 	heap_init(&h, compare_characters, NULL);
 	static Character_t *p;
@@ -1785,14 +2039,17 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 	int moveYdir = 0;
 	int isErratic = FALSE;
 	int gameStatus = 0;
+	bool gameOver = true;
 	
 	generateMonsters(dungeon, hardness, PC, num_Mon, characters, rooms, number_of_rooms); //generate the PC and the monsters
-	
+	generateEquipment(dungeon, hardness, num_Equip, equipment); //generates and places the equipment
+ 	
 	int inSight = FALSE;
-	
 	//Insert all the initial characters
 	for(i = 0; i <= *num_Mon; i++){
-		characters[i].hn = heap_insert(&h, &characters[i]);
+		if(characters[i].a && characters[i].pos[X_LOC] && characters[i].pos[Y_LOC]){ //adds monster to the movement queue if it is alive with rarity applied
+			characters[i].hn = heap_insert(&h, &characters[i]);
+		}
 	}
 	
 	//While the PC is alive, move monsters
@@ -1805,18 +2062,33 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 			//If the node pulled out is the PC then print the updated dungeon and pause
 			if(p->c == '@'){
 				//Runs commands for moving the PC
-				User_Input(characters, num_Mon, dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, rooms, number_of_rooms, &gameStatus, fogDungeon);
-				if(!*num_Mon){
+				User_Input(characters, num_Mon, dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, rooms, number_of_rooms, &gameStatus, fogDungeon, num_Equip, equipment);
+				for(int k = 0; k < WINDOW_Y; k++){ //bad way of checking if there are not monsters in the dungeon
+					for(int l = 0; l < WINDOW_X; l++){
+						int temp = (int) dungeon[k][l];
+						if(isalpha(temp) || gameStatus == 2){
+							gameOver = false;
+						}
+ 					}
+				}
+				if(gameOver){
 					gameStatus = 3;
 				}
+				gameOver = true;
 				if(gameStatus == 2){
 					for(i = 0; i < MAX_MONSTERS; i++){
 						heap_remove_min(&h); //remove all of the old monsters from the heap
+						if(!characters[i].u){ //if the monsters aren't unique then bring them back to life for the next level
+							characters[i].a = true;
+						}
 					}
 					generateMonsters(dungeon, hardness, PC, num_Mon, characters, rooms, number_of_rooms); //generate the new monsters
+					generateEquipment(dungeon, hardness, num_Equip, equipment); //generates and places the equipment
 					//Insert all the new characters
 					for(i = 0; i <= *num_Mon; i++){
-						characters[i].hn = heap_insert(&h, &characters[i]);
+						if(characters[i].a && characters[i].c){
+							characters[i].hn = heap_insert(&h, &characters[i]);	
+						}
 					}
 					gameStatus = 0; //sets game back to normal running mode
 				}
@@ -1949,7 +2221,7 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 				}
 			}
 			
-			p->nt = p->nt + 1000/p->s.base;
+			p->nt = p->nt + 1000/p->s;
 			heap_insert(&h, p);
 		}
 	}
@@ -2030,16 +2302,26 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 void init_terminal(void){
 	initscr(); //creates stdscr
 	raw(); //allows input with no exit way
-	noecho(); //
-	curs_set(0); //
-	keypad(stdscr, TRUE); //
+	noecho(); //???
+	curs_set(0); //???
+	keypad(stdscr, TRUE); //allows keypad commands
+	start_color();
+	init_pair(COLOR_BLACK, COLOR_WHITE, COLOR_BLACK);
+	init_pair(COLOR_RED, COLOR_RED, COLOR_BLACK);
+	init_pair(COLOR_GREEN, COLOR_GREEN, COLOR_BLACK);
+	init_pair(COLOR_YELLOW, COLOR_YELLOW, COLOR_BLACK);
+	init_pair(COLOR_BLUE, COLOR_BLUE, COLOR_BLACK);
+	init_pair(COLOR_MAGENTA, COLOR_MAGENTA, COLOR_BLACK);
+	init_pair(COLOR_CYAN, COLOR_CYAN, COLOR_BLACK);
+	init_pair(COLOR_WHITE, COLOR_WHITE, COLOR_BLACK);
 }
 
-void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]){
+void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS], int *num_Mon){
 	ifstream f(monst_file);
 	string testChar;
 	int i = 1;
 	int j = 0;
+	int k, tempDice, tempSides;
 	int maxDesc = 78;
 	string s, s1, s2;
 	bool readingMonst = false;
@@ -2077,7 +2359,7 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 						characters[i].name[k] = s[k];
 					}
 					compName = true;
-					cout << characters[i].name << endl;
+					// cout << characters[i].name << endl;
 				} else if(!s.compare("SYMB")){
 					s = "";
 					f.get();
@@ -2085,7 +2367,7 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 					s.erase(s.length()-1);
 					characters[i].c = s[0];
 					compSymb = true;
-					cout << characters[i].c << endl;	
+					// cout << characters[i].c << endl;	
 				} else if(!s.compare("COLOR")){
 					s = "";
 					s1 = "";
@@ -2103,30 +2385,32 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 							if(!s2.compare(" ")){ 
 								s += s2;
 							}
-							if(!s1.compare("BLACK")){
-								compColor = true;
-								characters[i].color.BLACK = true;
-							} else if(!s1.compare("RED")){
-								compColor = true;
-								characters[i].color.RED = true;
-							} else if(!s1.compare("GREEN")){
-								compColor = true;
-								characters[i].color.GREEN = true;
-							} else if(!s1.compare("YELLOW")){
-								compColor = true;
-								characters[i].color.YELLOW = true;
-							} else if(!s1.compare("BLUE")){
-								compColor = true;
-								characters[i].color.MAGENTA = true;
-							} else if(!s1.compare("MAGENTA")){
-								compColor = true;
-								characters[i].color.MAGENTA = true;
-							} else if(!s1.compare("CYAN")){
-								compColor = true;
-								characters[i].color.CYAN = true;
-							} else if(!s1.compare("WHITE")){
-								compColor = true;
-								characters[i].color.WHITE = true;
+							if(!compColor){
+								if(!s1.compare("BLACK")){
+									compColor = true;
+									characters[i].color.BLACK = true;
+								} else if(!s1.compare("RED")){
+									compColor = true;
+									characters[i].color.RED = true;
+								} else if(!s1.compare("GREEN")){
+									compColor = true;
+									characters[i].color.GREEN = true;
+								} else if(!s1.compare("YELLOW")){
+									compColor = true;
+									characters[i].color.YELLOW = true;
+								} else if(!s1.compare("BLUE")){
+									compColor = true;
+									characters[i].color.MAGENTA = true;
+								} else if(!s1.compare("MAGENTA")){
+									compColor = true;
+									characters[i].color.MAGENTA = true;
+								} else if(!s1.compare("CYAN")){
+									compColor = true;
+									characters[i].color.CYAN = true;
+								} else if(!s1.compare("WHITE")){
+									compColor = true;
+									characters[i].color.WHITE = true;
+								}
 							}
 							s1 = ""; //clears the s1 string for the next abilities reading
 						} else {
@@ -2134,7 +2418,14 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 							s += s2;
 						}
 					}
-					cout << s << endl;			
+					// cout << characters[i].color.BLACK << endl;	
+					// cout << characters[i].color.RED << endl;
+					// cout << characters[i].color.GREEN << endl;
+					// cout << characters[i].color.YELLOW << endl;
+					// cout << characters[i].color.BLUE << endl;
+					// cout << characters[i].color.MAGENTA << endl;
+					// cout << characters[i].color.CYAN << endl;
+					// cout << characters[i].color.WHITE << endl;					
 				} else if(!s.compare("DESC")){
 					getline(f, s); //clears whitespace and new line after DESC
 					s = ""; //clear s to add the complete description
@@ -2164,7 +2455,7 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 					for(int k = 0; k < s.length(); k++){
 						characters[i].description[k] = s[k];
 					}	
-					cout << characters[i].description << endl;
+					// cout << characters[i].description << endl;
 				} else if(!s.compare("SPEED")){
 					s = "";
 					s1 = "";
@@ -2177,24 +2468,26 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							characters[i].s.base = stoi(s1);
+							characters[i].s = stoi(s1);
 							s1 = "";
-						} else if(!s2.compare("d")){
+						} else if(!s2.compare("d")){ //grab number of dice
 							s1.erase(s1.length()-1);
-							characters[i].s.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
-						} else if(!s2.compare("\n")){
+						} else if(!s2.compare("\n")){ //Grab number of sides
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							characters[i].s.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compSpeed = true;
 						}
-						
 					}
-					cout << characters[i].s.base << "+" << characters[i].s.dice << "d" << characters[i].s.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						characters[i].s += 	1 + rand() % tempSides;
+					}
+					// cout << characters[i].s << endl;
 				} else if(!s.compare("DAM")){
 					s = "";
 					s1 = "";
@@ -2224,7 +2517,7 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 						}
 						
 					}
-					cout << characters[i].attackDamage.base << "+" << characters[i].attackDamage.dice << "d" << characters[i].attackDamage.sides << endl;
+					// cout << characters[i].attackDamage.base << "+" << characters[i].attackDamage.dice << "d" << characters[i].attackDamage.sides << endl;
 				} else if(!s.compare("HP")){
 					s = "";
 					s1 = "";
@@ -2237,24 +2530,27 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							characters[i].health.base = stoi(s1);
+							characters[i].health = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							characters[i].health.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							characters[i].health.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compHP = true;
 						}
 						
 					}
-					cout << characters[i].health.base << "+" << characters[i].health.dice << "d" << characters[i].health.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						characters[i].health += 1 + rand() % tempSides;
+					}
+					// cout << characters[i].health << endl;
 				} else if(!s.compare("ABIL")){
 					s = "";
 					s1 = "";
@@ -2306,7 +2602,7 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 							s += s2;
 						}
 					}
-					cout << s << endl;
+					// cout << s << endl;
 				} else if(!s.compare("RRTY")){
 					s = "";
 					f.get();
@@ -2314,11 +2610,12 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 					s.erase(s.length()-1);
 					characters[i].rarity = stoi(s);
 					compRar = true;	
-					cout << characters[i].rarity << endl;	
+					// cout << characters[i].rarity << endl;	
 				} else if(!s.compare("END")){
-					characters[i].a = TRUE;
+					*num_Mon += 1;
+					characters[i].a = true;
 					i++;
-					cout << "\n";
+					// cout << "\n";
 					readingMonst = false;
 				}
 			}
@@ -2332,12 +2629,13 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 	}
 }
 
-void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
+void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], int *num_Equip){
 	ifstream f(equip_file);
 	string testChar;
 	int i = 1;
 	int j = 0;
 	int maxDesc = 78;
+	int tempSides, tempDice, k;
 	string s, s1, s2;
 	bool readingEquip = false;
 	bool readingInfo = false;
@@ -2379,7 +2677,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						equipment[i].name[k] = s[k];
 					}
 					compName = true;
-					cout << equipment[i].name << endl;
+					// cout << equipment[i].name << endl;
 				} else if(!s.compare("TYPE")){
 					s = "";
 					f.get();
@@ -2387,45 +2685,64 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 					s.erase(s.length()-1);
 					if(!s.compare("WEAPON")){
 						equipment[i].equipment.weapon = true;
+						equipment[i].c = '|';
 					} else if(!s.compare("OFFHAND")){
 						equipment[i].equipment.offhand = true;
+						equipment[i].c = ')';
 					} else if(!s.compare("RANGED")){
 						equipment[i].equipment.ranged = true;
+						equipment[i].c = '}';
 					} else if(!s.compare("ARMOR")){
 						equipment[i].equipment.armor = true;
+						equipment[i].c = '[';
 					} else if(!s.compare("HELMET")){
 						equipment[i].equipment.helmet = true;
+						equipment[i].c = ']';
 					} else if(!s.compare("CLOAK")){
 						equipment[i].equipment.cloak = true;
+						equipment[i].c = '(';
 					} else if(!s.compare("GLOVES")){
 						equipment[i].equipment.gloves = true;
+						equipment[i].c = '{';
 					} else if(!s.compare("BOOTS")){
 						equipment[i].equipment.boots = true;
+						equipment[i].c = '\\';
 					} else if(!s.compare("RING")){
 						equipment[i].equipment.ring = true;
+						equipment[i].c = '=';
 					} else if(!s.compare("AMULET")){
 						equipment[i].equipment.amulet = true;
+						equipment[i].c = '"';
 					} else if(!s.compare("LIGHT")){
 						equipment[i].equipment.light = true;
+						equipment[i].c = '_';
 					} else if(!s.compare("SCROLL")){
 						equipment[i].equipment.scroll = true;
+						equipment[i].c = '~';
 					} else if(!s.compare("BOOK")){
 						equipment[i].equipment.book = true;
+						equipment[i].c = '?';
 					} else if(!s.compare("FLASK")){
 						equipment[i].equipment.flask = true;
+						equipment[i].c = '!';
 					} else if(!s.compare("GOLD")){
 						equipment[i].equipment.gold = true;
+						equipment[i].c = '$';
 					} else if(!s.compare("AMMUNITION")){
 						equipment[i].equipment.ammunition = true;
+						equipment[i].c = '/';
 					} else if(!s.compare("FOOD")){
 						equipment[i].equipment.food = true;
+						equipment[i].c = ',';
 					} else if(!s.compare("WAND")){
 						equipment[i].equipment.wand = true;
+						equipment[i].c = '-';
 					} else if(!s.compare("CONTAINER")){
 						equipment[i].equipment.container = true;
+						equipment[i].c = '%';
 					}
 					compType = true;
-					cout << s << endl;
+					// cout << s << endl;
 				} else if(!s.compare("DESC")){
 					getline(f, s); //clears whitespace and new line after DESC
 					s = ""; //clear s to add the complete description
@@ -2455,7 +2772,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 					for(int k = 0; k < s.length(); k++){
 						equipment[i].description[k] = s[k];
 					}	
-					cout << equipment[i].description << endl;
+					// cout << equipment[i].description << endl;
 				} else if(!s.compare("COLOR")){
 					s = "";
 					s1 = "";
@@ -2504,7 +2821,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 							s += s2;
 						}
 					}
-					cout << s << endl;			
+					// cout << s << endl;			
 				} else if(!s.compare("WEIGHT")){
 					s = "";
 					s1 = "";
@@ -2517,24 +2834,26 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].weight.base = stoi(s1);
+							equipment[i].weight = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].weight.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].weight.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compWeight = true;
 						}
-						
 					}
-					cout << equipment[i].weight.base << "+" << equipment[i].weight.dice << "d" << equipment[i].weight.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						equipment[i].weight += 1 + rand() % tempSides;
+					}
+					// cout << equipment[i].weight << endl;
 				} else if(!s.compare("HIT")){
 					s = "";
 					s1 = "";
@@ -2547,24 +2866,27 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].HB.base = stoi(s1);
+							equipment[i].HB = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].HB.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].HB.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compHit = true;
 						}
 						
 					}
-					cout << equipment[i].HB.base << "+" << equipment[i].HB.dice << "d" << equipment[i].HB.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						equipment[i].HB += 1 + rand() % tempSides;
+					}
+					// cout << equipment[i].HB << endl;
 				} else if(!s.compare("DAM")){
 					s = "";
 					s1 = "";
@@ -2592,9 +2914,8 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 							readingInfo = false;
 							compDam = true;
 						}
-						
 					}
-					cout << equipment[i].DB.base << "+" << equipment[i].DB.dice << "d" << equipment[i].DB.sides << endl;
+					// cout << equipment[i].DB.base << "+" << equipment[i].DB.dice << "d" << equipment[i].DB.sides << endl;
 				} else if(!s.compare("ATTR")){
 					s = "";
 					s1 = "";
@@ -2607,24 +2928,27 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].SA.base = stoi(s1);
+							equipment[i].SA = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].SA.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].SA.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compAttr = true;
 						}
 						
 					}
-					cout << equipment[i].SA.base << "+" << equipment[i].SA.dice << "d" << equipment[i].SA.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						equipment[i].SA += 1 + rand() % tempSides;
+					}
+					// cout << equipment[i].SA << endl;
 				} else if(!s.compare("VAL")){
 					s = "";
 					s1 = "";
@@ -2637,24 +2961,27 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].value.base = stoi(s1);
+							equipment[i].value = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].value.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].value.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compVal = true;
 						}
 						
 					}
-					cout << equipment[i].value.base << "+" << equipment[i].value.dice << "d" << equipment[i].value.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						equipment[i].value += 1 + rand() % tempSides;
+					}
+					// cout << equipment[i].value << endl;
 				} else if(!s.compare("DODGE")){
 					s = "";
 					s1 = "";
@@ -2667,24 +2994,27 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].DDB.base = stoi(s1);
+							equipment[i].DDB = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].DDB.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].DDB.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compDodge = true;
 						}
 						
 					}
-					cout << equipment[i].DDB.base << "+" << equipment[i].DDB.dice << "d" << equipment[i].DDB.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						equipment[i].DDB += 1 + rand() % tempSides;
+					}
+					// cout << equipment[i].DDB << endl;
 				} else if(!s.compare("DEF")){
 					s = "";
 					s1 = "";
@@ -2697,24 +3027,27 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].DFB.base = stoi(s1);
+							equipment[i].DFB = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].DFB.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].DFB.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compDef = true;
 						}
 						
 					}
-					cout << equipment[i].DFB.base << "+" << equipment[i].DFB.dice << "d" << equipment[i].DFB.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						equipment[i].DFB += 1 + rand() % tempSides;
+					}
+					// cout << equipment[i].DFB << endl;
 				} else if(!s.compare("SPEED")){
 					s = "";
 					s1 = "";
@@ -2727,24 +3060,27 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].SB.base = stoi(s1);
+							equipment[i].SB = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].SB.dice = stoi(s1);
+							tempDice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].SB.sides = stoi(s1);
+							tempSides = stoi(s1);
 							readingInfo = false;
 							compSpeed = true;
 						}
 						
 					}
-					cout << equipment[i].SB.base << "+" << equipment[i].SB.dice << "d" << equipment[i].SB.sides << endl;
+					for(k = 0; k < tempDice; k++){
+						equipment[i].SB += 1 + rand() % tempSides;
+					}
+					// cout << equipment[i].SB << endl;
 				} else if(!s.compare("RRTY")){
 					s = "";
 					f.get();
@@ -2752,7 +3088,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 					s.erase(s.length()-1);
 					equipment[i].rarity = stoi(s);
 					compRar = true;	
-					cout << equipment[i].rarity << endl;	
+					// cout << equipment[i].rarity << endl;	
 				} else if(!s.compare("ART")){
 					s = "";
 					f.get();
@@ -2764,10 +3100,12 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT]){
 						equipment[i].status = true;
 					}
 					compArt = true;	
-					cout << s << endl;	
+					// cout << s << endl;	
 				} else if(!s.compare("END")){
+					*num_Equip += 1;
+					equipment[i].a = true;
 					i++;
-					cout << "\n";
+					// cout << "\n";
 					readingEquip = false;
 				}
 			}
@@ -2854,17 +3192,17 @@ int main(int argc, char *argv[]){
 	*/	
 
 	/*
-	char *home = getenv("HOME");
+	home = getenv("HOME");
 	char *monst_file;
-	directory = (char *) malloc(strlen(home) + strlen("/.rlg327/monster_desc") + 1);
+	monst_file = (char *) malloc(strlen(home) + strlen("/.rlg327/monster_desc") + 1);
 	strcpy(monst_file, home);
 	strcat(monst_file, "/.rlg327/monster_desc");	
 	*/
 	
 	/*
-	char *home = getenv("HOME");
+	home = getenv("HOME");
 	char *obj_file;
-	directory = (char *) malloc(strlen(home) + strlen("/.rlg327/object_desc") + 1);
+	obj_file = (char *) malloc(strlen(home) + strlen("/.rlg327/object_desc") + 1);
 	strcpy(obj_file, home);
 	strcat(obj_file, "/.rlg327/object_desc");	
 	*/
@@ -2878,12 +3216,13 @@ int main(int argc, char *argv[]){
 	int i = 0;
 	int j = 0;
 	int num_Mon = 1;
+	int num_Equip = 0;
+	
+	// //initiates ncurses capabilities
+	init_terminal();
 	
 	user_action action;
 	if(argv[1] != NULL){
-		//initiates ncurses capabilities
-		init_terminal();
-		
 		if(!strcmp(argv[1], "--save")){
 			action = save;
 		} else if(!strcmp(argv[1], "--load")){
@@ -2903,33 +3242,54 @@ int main(int argc, char *argv[]){
 				loadDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters, fogDungeon);
 				printDungeon(dungeon, hardness);
-				// free(directory);	
+				// free(characters);
+				// free(equipment);
+				// free(directory);
+				// free(monst_file);
+				// free(obj_file);	
 				break;
 			case save:
 				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters, fogDungeon);
 				saveDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 				printDungeon(dungeon, hardness);
+				// free(characters);
+				// free(equipment);
 				// free(directory);
+				// free(monst_file);
+				// free(obj_file);
 				break;
 			case load_save:
 				loadDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters, fogDungeon);
 				saveDungeon(hardness, directory, PC, &number_of_rooms, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms);
 				printDungeon(dungeon, hardness);
+				// free(characters);
+				// free(equipment);
 				// free(directory);
+				// free(monst_file);
+				// free(obj_file);
 				break;
 			case num_mon:
 				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters, fogDungeon);
-				simulateGame(characters, &num_Mon, dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, fogDungeon);
-				free(characters);
+				simulateGame(characters, &num_Mon, dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, fogDungeon, &num_Equip, equipment);
+				// free(characters);
+				// free(equipment);
 				// free(directory);
+				// free(monst_file);
+				// free(obj_file);
 				break;
 		}
 	} else {
 		// cout << "Please enter: <--save, --load, --load--save> after './game' to perform an action";
-		parseMonstFile(monst_file, characters);
-		//parseObjFile(obj_file, equipment);
-		free(characters);
+		parseMonstFile(monst_file, characters, &num_Mon);
+		parseObjFile(obj_file, equipment, &num_Equip);
+		generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters, fogDungeon);
+		simulateGame(characters, &num_Mon, dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, fogDungeon, &num_Equip, equipment);
+		// free(characters);
+		// free(equipment);
+		// free(directory);
+		// free(monst_file);
+		// free(obj_file);
 	}
 	return 0;
 }
