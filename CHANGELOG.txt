@@ -121,3 +121,15 @@ I added the additions to the PC specs when equiped
 4-13: I changed deleteMonst to add the new combat for the NPC
 I added every key function for item usage
 I added the final touches with a cursor when viewing the items and the PC specs below the map
+
+4-22: I added fire/light sources
+I added the shooting ability
+Got rid of diagonal movement
+
+4-23: I added entry-text and updated in game text for commands
+I added dodge abilities
+I added traps
+
+4-24: I added the new inventory layout, but has no current usage. Just there as a concept right now
+
+4-25:
