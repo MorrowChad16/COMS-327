@@ -57,10 +57,10 @@ class Cell_t {
 class Color {
 public:
 	bool BLACK;
-	bool RED;
 	bool GREEN;
 	bool YELLOW;
 	bool BLUE;
+	bool RED;
 	bool MAGENTA;
 	bool CYAN;
 	bool WHITE;
@@ -94,6 +94,7 @@ class Items{
 		bool food;
 		bool wand;
 		bool container;
+		bool trap;
 };
 
 class Equipment{
@@ -102,13 +103,13 @@ class Equipment{
 		char description[1024]; //holds the description of the monster
 		Items equipment;
 		Color color;
-		int HB; //hit bonus
-		Dice DB; //damage bonus
-		int DDB; //dodge bonus
-		int DFB; //defense bonus
+		int HitBonus; //hit bonus
+		Dice DamageBonus; //damage bonus
+		int DodgeBonus; //dodge bonus
+		int DefenseBonus; //defense bonus
 		int weight;
-		int SB; //speed bonus
-		int SA; //special attribute
+		int SpeedBonus; //speed bonus
+		int SpecialAtr; //special attribute
 		int value;
 		bool status;
 		int rarity;
@@ -157,8 +158,13 @@ class Character_t {
 		int health; //Dice class for health
 		Dice attackDamage; //Dice class for attackDamage
 		int rarity; //odds of spawing the monster
-		int storage[NUM_STORAGE]; //stores items index for the character to use later
+		int storage[NUM_STORAGE]; //stores items index. Can include anything, but should be used for equipment
 		int equiped[NUM_STORAGE + 2]; //1 slot for each type of item for the character to use
+		int weapons[4]; //sword, offhand, ranged and wand
+		int spells[5]; //temporary boosts to 
+		int armor[5]; //armor, helmet, cloak, gloves, shoes
+		int ammunition[3]; //arrows, traps and throwable lights
+		int dodge; //dodge ability of PC
 };
 
 // class PC_t : public Character_t{
@@ -998,7 +1004,7 @@ void printMonsters(Character_t monsters[MAX_MONSTERS], int *num_Mon){
 
 //function deletes a monster and updates the characters array
 int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_MONSTERS], int oldXpos, int *moveX, int oldYpos, int *moveY, int *num_Mon, bool isPC, Equipment equipment[MAX_EQUIPMENT]){
-	int i, j, index, tempX, tempY;
+	int i, j, index, tempX, tempY, randDodge, charLoc;
 	int newYpos = oldYpos + *moveY;
 	int newXpos = oldXpos + *moveX;
 	bool isPlaced = false;
@@ -1035,7 +1041,10 @@ int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_M
 			if(newYpos == characters[i].pos[Y_LOC] && newXpos == characters[i].pos[X_LOC] && characters[i].a){ //checks if the new position is occupied by a monster
 				characters[i].health -= characters[0].attackDamage.base;
 				for(int m = 0; m < characters[0].attackDamage.dice; m++){
-					characters[i].health -= 1 + rand() % characters[0].attackDamage.sides;
+					randDodge = 1 + rand() % 1000;
+					if(randDodge > characters[i].dodge){ //If randDodge is above the characters dodge ability then the attack hits
+						characters[i].health -= 1 + rand() % characters[0].attackDamage.sides;
+					}
 				} 
 				if(characters[i].health < 0){
 					dungeon[newYpos][newXpos] = characters[i].lv; //Replace the pos with the dungeon char
@@ -1053,19 +1062,23 @@ int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_M
 		}
 		return 0;
 	} else { //if the char is an NPC then check if the spot is a monster
+	
+		for(int b = 0; b < MAX_MONSTERS; b++){ //find monster we're attacking with
+			if(oldXpos == characters[b].pos[X_LOC] && oldYpos == characters[b].pos[Y_LOC]){
+				index = b;
+			}
+		}
+		
 		for(i = 0; i < MAX_MONSTERS; i++){ //loops through all our characters
 			if(newYpos == characters[i].pos[Y_LOC] && newXpos == characters[i].pos[X_LOC] && characters[i].a){ //checks if the new position is occupied by a monster
-				
-				for(int b = 0; b < MAX_MONSTERS; b++){ //find monster we're attacking with
-					if(oldXpos == characters[b].pos[X_LOC] && oldYpos == characters[b].pos[Y_LOC]){
-						index = b;
-					}
-				}
 				
 				if(i == 0){ //reduce PC health
 					characters[0].health -= characters[index].attackDamage.base;
 					for(int b = 0; b < characters[index].attackDamage.dice; b++){
-						characters[0].health -= 1 + rand() % characters[index].attackDamage.sides;
+						randDodge = 1 + rand() % 1000;
+						if(randDodge > characters[0].dodge){ //if randDodge is above the PC's dodgeBonus then the attack hits
+							characters[0].health -= 1 + rand() % characters[index].attackDamage.sides;
+						}
 					}
 					*moveX = 0;
 					*moveY = 0;
@@ -1105,6 +1118,32 @@ int deleteMonster(char dungeon[WINDOW_Y][WINDOW_X], Character_t characters[MAX_M
 				}
 			}
 		}
+		
+		for(int x = 0; x < MAX_MONSTERS; x++){
+			if(equipment[x].pos[X_LOC] == newXpos && equipment[x].pos[Y_LOC] == newYpos && equipment[x].a){
+				charLoc = x;
+			}
+		}
+			
+		if(dungeon[newYpos][newXpos] == 'T' && equipment[charLoc].color.RED){
+			characters[index].health -= equipment[charLoc].DamageBonus.base;
+			for(int b = 0; b < equipment[charLoc].DamageBonus.dice; b++){
+				characters[index].health -= 1 + rand() % equipment[charLoc].DamageBonus.sides;
+			}
+			dungeon[newYpos][newXpos] = equipment[charLoc].lv;
+			equipment[charLoc].pos[X_LOC] = 0;
+			equipment[charLoc].pos[Y_LOC] = 0;
+			equipment[charLoc].a = false;
+		}
+		
+		if(characters[index].health < 0){
+			dungeon[oldYpos][oldXpos] = characters[index].lv;
+			characters[index].a = false;
+			characters[index].pos[X_LOC] = 0;
+			characters[index].pos[Y_LOC] = 0;
+			return 1;
+		}
+		
 		return 0;
 	}
 	return 0;
@@ -1139,8 +1178,9 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 						int wholeMap[GAME_HEIGHT][GAME_WIDTH], int PC[2], int upwardCases[MAX_ROOMS][2], int downwardCases[MAX_ROOMS][2], 
 						int *number_of_upstairs, int *number_of_downstairs, int rooms[MAX_ROOMS][MAX_CONSTRAINTS], int *number_of_rooms, int *gameStatus,
 						char fogDungeon[GAME_HEIGHT][GAME_WIDTH], int *num_Equip, Equipment equipment[MAX_EQUIPMENT]){
-	int row, col, i, cmnd, randX, randY, j, maxLoop;
-	int errorMessage = -1;
+	int row, col, i, cmnd, randX, randY, j, maxLoop, input, shootingMessage, charIndex, monIndex, randDodge, tempCurs;
+	int wpKey, arKey, amKey, spKey, stKey;
+	int message = -1;
 	int key, eKey, iKey, temp;
 	int isError = 0;
 	bool isStored = false;
@@ -1152,6 +1192,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 	bool isSwapped = false;
 	int randLoc;
 	int randLocArr[8][2]; //X, Y
+	bool onMonster = false;
 	randLocArr[0][0] = 1;
 	randLocArr[0][1] = 0;
 	
@@ -1176,10 +1217,10 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 	randLocArr[7][0] = 1;
 	randLocArr[7][1] = -1;
 	
-	if(errorMessage == 3){
+	if(message == 100){
 		CMD:;
 		clear();
-		mvprintw(0, 0, "Commands:\n<7 or y>: Move PC Up-Left\n<8 or k>: Move PC Up\n<9 or u>: Move PC Up-Right\n<6 or l>: Move PC Right\n<3 or n>: Move PC Down-Right\n<2 or j>: Move PC Down\n<1 or b>: Move PC Down-Left\n<4 or h>: Move PC Left\n<'>'>: Go Down Stairs\n<'<'>: Go Up Stairs\n<5 or space or .>: Rest PC\n<m>: Display Monsters\n<Q>: Quit\n\nPress any key to exit");
+		mvprintw(0, 0, "Commands:\nUP_KEY: Move PC Up\nRIGHT KEY: Move PC Right\nDOWN_KEY: Move PC Down\nLEFT_KEY: Move PC Left\n>: Go Down Stairs\n<: Go Up Stairs\n.: Rest PC\nm: Display Monsters\ni: Inventory\ne: Equiped\nQ: Quit\n\nPress any key to exit");
 		key = getch();
 		switch(key){
 			default:
@@ -1191,10 +1232,24 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 	DFT:;
 	refresh();
 	clear();
+	
 	//updates fog map
-	for(row = characters[0].pos[Y_LOC] - 2; row < characters[0].pos[Y_LOC] + 3; row++){
-		for(col = characters[0].pos[X_LOC] - 2; col < characters[0].pos[X_LOC] + 3; col++){
-			fogDungeon[row][col] = dungeon[row][col];
+	for(int row = 0; row < GAME_HEIGHT; row++){
+		for(int col = 0; col < GAME_WIDTH; col++){
+			if(dungeon[row][col] == '+'){ //if its a fire source 
+				for(int k = row - 1; k < row + 2; k++){
+					for(int m = col - 1; m < col + 2; m++){
+						fogDungeon[k][m] = dungeon[k][m];
+					}
+				}
+			}
+			if(dungeon[row][col] == '@'){ //if its the pc add the 5x5 range around it
+				for(int h = row - 2; h < row + 3; h++){
+					for(int b = col - 2; b < col + 3; b++){
+						fogDungeon[h][b] = dungeon[h][b];
+					}
+				}
+			}
 		}
 	}
 	
@@ -1204,12 +1259,23 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			if(characters[0].storage[k] == -1 && !isStored){ //character has an empty slot for a new item
 				for(int l = 0; l < *num_Equip; l++){ //loop through equipment to find the right one
 					if(characters[0].pos[Y_LOC] == equipment[l].pos[Y_LOC] && characters[0].pos[X_LOC] == equipment[l].pos[X_LOC] && !isStored){ //look for equipment with same position as PC
-						characters[0].storage[k] = l;
-						characters[0].lv = equipment[l].lv; //put equipment lv into the characters lv
-						isStored = true;
-						equipment[l].isHeld = true;
-						equipment[l].pos[X_LOC] = 0;
-						equipment[l].pos[Y_LOC] = 0;
+						if(equipment[l].equipment.trap && equipment[l].color.RED){
+							characters[0].health -= equipment[l].DamageBonus.base;
+							for(int b = 0; b < equipment[l].DamageBonus.dice; b++){
+								characters[0].health -= 1 + rand() % equipment[l].DamageBonus.sides;
+							}
+							characters[0].lv = equipment[l].lv;
+							equipment[l].pos[X_LOC] = 0;
+							equipment[l].pos[Y_LOC] = 0;
+							equipment[l].a = false;
+						} else {
+							characters[0].storage[k] = l;
+							characters[0].lv = equipment[l].lv; //put equipment lv into the characters lv
+							isStored = true;
+							equipment[l].isHeld = true;
+							equipment[l].pos[X_LOC] = 0;
+							equipment[l].pos[Y_LOC] = 0;
+						}
 					}
 				}
 			}
@@ -1221,7 +1287,8 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 	for(row = 0; row < GAME_HEIGHT; row++){
 		for(col = 0; col < GAME_WIDTH; col++){
 			if(fogDungeon[row][col] == '.' || fogDungeon[row][col] == '#' || fogDungeon[row][col] == ' ' || fogDungeon[row][col] == '|' 
-				|| fogDungeon[row][col] == '-' || fogDungeon[row][col] == '@' || fogDungeon[row][col] == '<' || fogDungeon[row][col] == '>'){ //always white
+				|| fogDungeon[row][col] == '-' || fogDungeon[row][col] == '@' || fogDungeon[row][col] == '<' || fogDungeon[row][col] == '>' 
+				|| fogDungeon[row][col] == '+' || fogDungeon[row][col] == '`'){ //always white
 				mvaddch(row, col, fogDungeon[row][col]);
 			} else {
 				j = 0;
@@ -1308,46 +1375,24 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 		}
 	}
 
-	ER:;
+	printw("\nPC HP: %d	PC Speed: %d	PC DAMAGE: %d+%dd%d", characters[0].health, characters[0].s, characters[0].attackDamage.base, characters[0].attackDamage.dice, characters[0].attackDamage.sides);
 	
-	if(errorMessage == 0){
+	ER:;
+	if(message == 0){
 		mvprintw(MESSAGES, 0, "YOU ARE RUNNING INTO A WALL! GO IN A NEW DIRECTION!\n");
-	} else if(errorMessage == 1){
+	} else if(message == 1){
 		mvprintw(MESSAGES, 0, "YOU ARE NOT ON A DOWN STAIR CASE!\n");
-	} else if(errorMessage == 2){
+	} else if(message == 2){
 		mvprintw(MESSAGES, 0, "YOU ARE NOT ON AN UP STAIR CASE!\n");
+	} else if(message == 3){
+		mvprintw(MESSAGES, 0, "YOU ARE NOT ON DEBRIS!\n");
+	} else if(message == 4){
+		mvprintw(MESSAGES, 0, "YOU DO NOT HAVE A RANGED WEAPON!\n");
 	}
 	
-	printw("PC HP: %d	PC Speed: %d	PC DAMAGE: %d+%dd%d", characters[0].health, characters[0].s, characters[0].attackDamage.base, characters[0].attackDamage.dice, characters[0].attackDamage.sides);
 	key = getch();
 	switch(key) {
-		case 'y': //UP-LEFT
-			Y:;
-			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
-				//Checks if space is occupied by a monster
-				moveY = -1;
-				moveX = -1;
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] += moveY; //Update Y
-				characters[0].pos[X_LOC] += moveX; //Update X
-				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
-			} else {
-				errorMessage = 0;
-				goto ER;
-			}
-			break;
-		case '7': //UP-LEFT
-			goto Y; //Goes to default UP-LEFT case
-			break;
-		case KEY_HOME: //UP-LEFT
-			goto Y; //Goes to default UP-LEFT case
-			break;
-		//-------------------------------------------------------------------------------------------------------------------------------	
-		case 'k': //UP
-			K:;
-			
+		case KEY_UP: //UP
 			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC]]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
 				moveY = -1;
@@ -1358,43 +1403,12 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
-				errorMessage = 0;
+				message = 0;
 				goto ER;
 			}
 			break;
-		case '8': //UP
-			goto K; //Goes to default UP case
-			break;
-		case KEY_UP: //UP
-			goto K; //Goes to default UP case
-			break;
 		//-------------------------------------------------------------------------------------------------------------------------------	
-		case 'u': //UP-RIGHT
-			U:;
-			if(!hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
-				//Checks if space is occupied by a monster
-				moveY = -1;
-				moveX = 1;
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] += moveY; //Update Y
-				characters[0].pos[X_LOC] += moveX; //Update X
-				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
-			} else {
-				errorMessage = 0;
-				goto ER;
-			}
-			break;
-		case '9': //UP-RIGHT
-			goto U; //Goes to default UP-RIGHT case
-			break;
-		case KEY_PPAGE: //UP-RIGHT
-			goto U; //Goes to default UP-RIGHT case
-			break;
-		//-------------------------------------------------------------------------------------------------------------------------------	
-		case 'l': //RIGHT
-			L:;
+		case KEY_RIGHT: //RIGHT
 			if(!hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
 				moveY = 0;
@@ -1406,45 +1420,13 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 
 			} else {
-				errorMessage = 0;
+				message = 0;
 				goto ER;
 				
 			}
 			break;
-		case '6': //RIGHT
-			goto L; //Goes to default RIGHT case
-			break;
-		case KEY_RIGHT: //RIGHT
-			goto L; //Goes to default RIGHT case
-			break;
 		//-------------------------------------------------------------------------------------------------------------------------------	
-		case 'n': //DOWN-RIGHT
-			N:;
-			
-			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] + 1]){ //checks new space is empty space
-				//Checks if space is occupied by a monster
-				moveY = 1;
-				moveX = 1;
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] += moveY; //Update Y
-				characters[0].pos[X_LOC] += moveX; //Update X
-				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
-			} else {
-				errorMessage = 0;
-				goto ER;
-			}
-			break;
-		case '3': //DOWN-RIGHT
-			goto N; //Goes to default DOWN-RIGHT case
-			break;
-		case KEY_NPAGE: //DOWN-RIGHT
-			goto N; //Goes to default DOWN-RIGHT case 
-			break;
-		//-------------------------------------------------------------------------------------------------------------------------------	
-		case 'j': //DOWN
-			J:;
+		case KEY_DOWN: //DOWN
 			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC]]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
 				moveY = 1;
@@ -1455,43 +1437,12 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
-				errorMessage = 0;
+				message = 0;
 				goto ER;
 			}
 			break;
-		case '2': //DOWN
-			goto J; //Goes to default DOWN case
-			break;
-		case KEY_DOWN: //DOWN
-			goto J; //Goes to default DOWN case
-			break;
 		//-------------------------------------------------------------------------------------------------------------------------------	
-		case 'b': //DOWN-LEFT
-			B:;
-			if(!hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
-				//Checks if space is occupied by a monster
-				moveY = 1;
-				moveX = -1;
-				deleteMonster(dungeon, characters, characters[0].pos[X_LOC], &moveX, characters[0].pos[Y_LOC], &moveY, num_Mon, true, equipment);
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].lv; //update dungeon with covered character by PC
-				characters[0].pos[Y_LOC] += moveY; //Update Y
-				characters[0].pos[X_LOC] += moveX; //Update X
-				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
-				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
-			} else {
-				errorMessage = 0;
-				goto ER;
-			}
-			break;
-		case '1': //DOWN-LEFT
-			goto B; //Goes to default DOWN-LEFT case
-			break;
-		case KEY_END: //DOWN-LEFT
-			goto B; //Goes to default DOWN-LEFT case
-			break;
-		//-------------------------------------------------------------------------------------------------------------------------------	
-		case 'h': //LEFT
-			H:;
+		case KEY_LEFT: //LEFT
 			if(!hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] - 1]){ //checks new space is empty space
 				//Checks if space is occupied by a monster
 				moveY = 0;
@@ -1502,29 +1453,14 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				characters[0].lv = dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]]; //Update LV
 				dungeon[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC]] = characters[0].c; //update dungeon
 			} else {
-				errorMessage = 0;
+				message = 0;
 				goto ER;
 			}
-			break;
-		case '4': //LEFT
-			goto H; //Goes to default LEFT case
-			break;
-		case KEY_LEFT: //LEFT
-			goto H; //Goes to default LEFT case
 			break;
 		//-------------------------------------------------------------------------------------------------------------------------------	
 		case '.': //REST
 			R:;
 			//PC doesn't do anything
-			break;
-		case ' ': //REST
-			goto R; //Goes to default REST case
-			break;
-		case '5': //REST
-			goto R; //Goes to default REST case
-			break;
-		case KEY_B2: //REST
-			goto R; //Goes to default REST case
 			break;
 		//-------------------------------------------------------------------------------------------------------------------------------	
 		case '>': //attempts to go downstairs
@@ -1532,7 +1468,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, rooms, number_of_rooms, 1, num_Mon, characters, fogDungeon);
 				*gameStatus = 2;
 			} else {
-				errorMessage = 1;
+				message = 1;
 				goto ER;
 			}
 			break;
@@ -1542,9 +1478,206 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, number_of_upstairs, number_of_downstairs, rooms, number_of_rooms, 1, num_Mon, characters, fogDungeon);
 				*gameStatus = 2;
 			} else {
-				errorMessage = 2;
+				message = 2;
 				goto ER;
 			}
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------
+		case 'l': //lights debris on fire
+			if(characters[0].lv == '`'){
+				characters[0].lv = '+';
+			} else {
+				message = 3;
+				goto ER;
+			}
+		break;
+		//-------------------------------------------------------------------------------------------------------------------------------
+		case 's': //shoot if you have a ranged weapon
+			tempX = characters[0].pos[X_LOC];
+			tempY = characters[0].pos[Y_LOC]; 
+			shootingMessage = 0;
+			if(characters[0].equiped[2] != -1){
+				WINDOW *w;
+				w = newwin(24, 80, 0, 0);
+				
+				RESET:;
+				wrefresh(w);
+				clear();
+				for(int row = characters[0].pos[Y_LOC] - 3; row < characters[0].pos[Y_LOC] + 4; row++){
+					for(int col = characters[0].pos[X_LOC] - 3; col < characters[0].pos[X_LOC] + 4; col++){
+						if(row == tempY && col == tempX){ //always white
+							mvaddch(row, col, '*');
+						} else if(dungeon[row][col] == '.' || dungeon[row][col] == '#' || dungeon[row][col] == ' ' || dungeon[row][col] == '|' 
+							|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>' 
+							|| dungeon[row][col] == '+' || dungeon[row][col] == '`'){
+							mvaddch(row, col, dungeon[row][col]);
+						}else {
+							j = 0;
+							//Could use macro here to speed up but forgot how to and I'm lazy
+							if(*num_Mon > *num_Equip){
+								maxLoop = *num_Mon;
+							} else {
+								maxLoop = *num_Equip;
+							}
+							//REALLY LENGTHY WAY OF DOING THIS, HAVE TO BE AN EASIER TO WAY TO QUICKLY LOOK UP WHAT COLOR AND CHARACTER IS THERE
+							while(j < maxLoop){
+								if(characters[j].pos[Y_LOC] == row && characters[j].pos[X_LOC] == col && characters[j].a){ //generates monsters with colors
+									if(characters[j].color.BLACK){
+										attron(COLOR_PAIR(COLOR_BLACK));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLACK));
+									} else if(characters[j].color.RED){
+										attron(COLOR_PAIR(COLOR_RED));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_RED));
+									} else if(characters[j].color.GREEN){
+										attron(COLOR_PAIR(COLOR_GREEN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_GREEN));
+									} else if(characters[j].color.YELLOW){
+										attron(COLOR_PAIR(COLOR_YELLOW));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_YELLOW));
+									} else if(characters[j].color.BLUE){
+										attron(COLOR_PAIR(COLOR_BLUE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLUE));
+									} else if(characters[j].color.MAGENTA){
+										attron(COLOR_PAIR(COLOR_MAGENTA));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_MAGENTA));
+									} else if(characters[j].color.CYAN){
+										attron(COLOR_PAIR(COLOR_CYAN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_CYAN));
+									} else if(characters[j].color.WHITE){
+										attron(COLOR_PAIR(COLOR_WHITE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_WHITE));
+									}
+								} else if(equipment[j].pos[Y_LOC] == row && equipment[j].pos[X_LOC] == col && equipment[j].a){ //generates equipment with colors
+									if(equipment[j].color.BLACK){
+										attron(COLOR_PAIR(COLOR_BLACK));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLACK));
+									} else if(equipment[j].color.RED){
+										attron(COLOR_PAIR(COLOR_RED));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_RED));
+									} else if(equipment[j].color.GREEN){
+										attron(COLOR_PAIR(COLOR_GREEN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_GREEN));
+									} else if(equipment[j].color.YELLOW){
+										attron(COLOR_PAIR(COLOR_YELLOW));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_YELLOW));
+									} else if(equipment[j].color.BLUE){
+										attron(COLOR_PAIR(COLOR_BLUE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_BLUE));
+									} else if(equipment[j].color.MAGENTA){
+										attron(COLOR_PAIR(COLOR_MAGENTA));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_MAGENTA));
+									} else if(equipment[j].color.CYAN){
+										attron(COLOR_PAIR(COLOR_CYAN));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_CYAN));
+									} else if(equipment[j].color.WHITE){
+										attron(COLOR_PAIR(COLOR_WHITE));
+										mvaddch(row, col, dungeon[row][col]);
+										attroff(COLOR_PAIR(COLOR_WHITE));
+									} 
+								}
+								j++;
+							}
+						}
+					}
+				}
+				
+				FAIL:;
+				if(shootingMessage == 1){
+					mvprintw(MESSAGES, 0, "You can't move any further\n");
+				} else if(shootingMessage == 2){
+					mvprintw(MESSAGES, 0, "You aren't shooting a monster location\n");
+				}
+				shootingMessage = 0;
+				input = getch();
+				switch(input){
+					case KEY_UP:
+						if(tempY > characters[0].pos[Y_LOC] - 3 && hardness[tempY - 1][tempX] != 255){
+							tempY--;
+							goto RESET;
+						} else {
+							shootingMessage = 1;
+							goto FAIL;
+						}
+						break;
+					case KEY_DOWN:
+						if(tempY < characters[0].pos[Y_LOC] + 3 && hardness[tempY + 1][tempX] != 255){
+							tempY++;
+							goto RESET;
+						} else {
+							shootingMessage = 1;
+							goto FAIL;
+						}
+						break;
+					case KEY_RIGHT:
+						if(tempX < characters[0].pos[X_LOC] + 3 && hardness[tempY][tempX + 1] != 255){
+							tempX++;
+							goto RESET;
+						} else {
+							shootingMessage = 1;
+							goto FAIL;
+						}
+						break;
+					case KEY_LEFT:
+						if(tempX > characters[0].pos[X_LOC] - 3 && hardness[tempY][tempX - 1] != 255){
+							tempX--;
+							goto RESET;
+						} else {
+							shootingMessage = 1;
+							goto FAIL;
+						}
+						break;
+					case 's': //shoot the location if it's a monster
+						while(monIndex < *num_Mon){
+							if(characters[monIndex].pos[Y_LOC] == tempY && characters[monIndex].pos[X_LOC] == tempX){
+								charIndex = monIndex;
+								onMonster = true;
+							}
+							monIndex++;
+						}
+						
+						if(onMonster){
+							characters[charIndex].health -= equipment[characters[0].equiped[2]].DamageBonus.base;
+							for(j = 0; j < equipment[characters[0].equiped[2]].DamageBonus.dice; j++){
+								randDodge = 1 + rand() % 1000;
+								if(randDodge > characters[charIndex].dodge){ //If randDodge is above the characters dodge ability then the attack hits
+									characters[charIndex].health -= 1 + rand() % equipment[characters[0].equiped[2]].DamageBonus.sides;
+								}
+							} 
+							// mvwprintw(w, MESSAGES, 0, "You shot %c with %c\n", characters[charIndex].c, equipment[characters[0].equiped[2]].c);
+							// sleep(2);
+							onMonster = false;
+						} else {
+							shootingMessage = 2;
+							goto FAIL;
+						}
+						break;
+					case 27:
+						break;
+					default:
+						goto FAIL;
+						break;
+				}
+				endwin();
+			} else {
+				message = 4;
+				goto ER;
+			}
+			goto DFT;
 			break;
 		//-------------------------------------------------------------------------------------------------------------------------------
 		case 'm': //Print Monsters
@@ -1564,7 +1697,8 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			for(row = 0; row < GAME_HEIGHT; row++){
 				for(col = 0; col < GAME_WIDTH; col++){
 					if(dungeon[row][col] == '.' || dungeon[row][col] == '#' || dungeon[row][col] == ' ' || dungeon[row][col] == '|' 
-						|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>'){ //always white
+						|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>' 
+						|| dungeon[row][col] == '+' || dungeon[row][col] == '`'){ //always white
 						mvaddch(row, col, dungeon[row][col]);
 					} else {
 						j = 0;
@@ -1659,6 +1793,274 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			delwin(w);
 			break;
 		//-------------------------------------------------------------------------------------------------------------------------------
+		case 'v':
+			WINDOW *tempWin;
+			tempWin = newwin(24, 80, 0, 0);
+			cursLoc = 0;
+			
+			REFRESH:;
+			wrefresh(tempWin);
+			clear();
+			printw("###INVENTORY###\n\n");
+			for(int k = 0; k < 5; k++){
+				if(k == 0){
+					printw("Weapons");
+				} else if(k == 1){
+					printw("Armor");
+				} else if(k == 2){
+					printw("Ammunition");
+				} else if(k == 3){
+					printw("Spells");
+				} else if(k == 4){
+					printw("Storage");
+				}
+				
+				if(k == cursLoc){
+					printw(" <<");
+				}
+				printw("\n");
+			}
+			printw("\nPress ESC to return");
+			iKey = getch();
+			switch(iKey){
+				case KEY_UP:
+					if(cursLoc - 1 >= 0){
+						cursLoc--;
+					}
+					goto REFRESH;	
+					break;
+				case KEY_DOWN:
+					if(cursLoc + 1 < 5){
+						cursLoc++;
+					}
+					goto REFRESH;
+					break;
+				case ' ':
+					if(cursLoc == 0){ //weapons
+						tempCurs = 0;
+						WINDOW *wp;
+						wp = newwin(24, 80, 0, 0);
+						
+						wpRefresh:;
+						
+						wrefresh(wp);
+						clear();
+						printw("###WEAPONS###\n\n");
+						for(int k = 0; k < 4; k++){
+							if(k == 0){
+								printw("Sword: %c", equipment[characters[0].weapons[k]].c);
+							} else if(k == 1){
+								printw("Offhand: %c", equipment[characters[0].weapons[k]].c);
+							} else if(k == 2){
+								printw("Ranged: %c", equipment[characters[0].weapons[k]].c);
+							} else if(k == 3){
+								printw("Wand: %c", equipment[characters[0].weapons[k]].c);
+							}
+							if(k == tempCurs){
+								printw(" <<");
+							}
+							printw("\n");
+						}
+						printw("\n\nPress ESC to return");
+						wpKey = getch();
+						switch(wpKey){
+							case KEY_UP:
+								if(tempCurs - 1 >= 0){
+									tempCurs--;
+								}
+								goto wpRefresh;	
+								break;
+							case KEY_DOWN:
+								if(tempCurs + 1 < 4){
+									tempCurs++;
+								}
+								goto wpRefresh;
+								break;
+							case 27:
+								delwin(wp);
+								goto REFRESH;
+							default:
+								goto wpRefresh;
+						}
+					} else if(cursLoc == 1){ //armor
+						tempCurs = 0;
+						WINDOW *ar;
+						ar = newwin(24, 80, 0, 0);
+						
+						arRefresh:;
+						
+						wrefresh(ar);
+						clear();
+						printw("###ARMOR###\n\n");
+						for(int k = 0; k < 5; k++){ //armor, helmet, cloak, gloves, shoes
+							if(k == 0){
+								printw("Armor: %c", equipment[characters[0].armor[k]].c);
+							} else if(k == 1){
+								printw("Helmet: %c", equipment[characters[0].weapons[k]].c);
+							} else if(k == 2){
+								printw("Cloak: %c", equipment[characters[0].weapons[k]].c);
+							} else if(k == 3){
+								printw("Gloves: %c", equipment[characters[0].weapons[k]].c);
+							} else if(k == 4){
+								printw("Shoes: %c", equipment[characters[0].weapons[k]].c);
+							}
+							if(k == tempCurs){
+								printw(" <<");
+							}
+							printw("\n");
+						}
+						printw("\n\nPress ESC to return");
+						arKey = getch();
+						switch(arKey){
+							case KEY_UP:
+								if(tempCurs - 1 >= 0){
+									tempCurs--;
+								}
+								goto arRefresh;	
+								break;
+							case KEY_DOWN:
+								if(tempCurs + 1 < 4){
+									tempCurs++;
+								}
+								goto arRefresh;
+								break;
+							case 27:
+								delwin(ar);
+								goto REFRESH;
+							default:
+								goto arRefresh;
+						}
+					} else if(cursLoc == 2){ //ammuntion
+						tempCurs = 0;
+						WINDOW *am;
+						am = newwin(24, 80, 0, 0);
+						
+						amRefresh:;
+						
+						wrefresh(am);
+						clear();
+						printw("###AMMUNITION###\n\n");
+						for(int k = 0; k < 3; k++){
+							if(k == 0){
+								printw("Arrows: %c", equipment[characters[0].ammunition[k]].c);
+							} else if(k == 1){
+								printw("??: %c", equipment[characters[0].ammunition[k]].c);
+							} else if(k == 2){
+								printw("??: %c", equipment[characters[0].ammunition[k]].c);
+							}
+							if(k == tempCurs){
+								printw(" <<");
+							}
+							printw("\n");
+						}
+						printw("\n\nPress ESC to return");
+						amKey = getch();
+						switch(amKey){
+							case KEY_UP:
+								if(tempCurs - 1 >= 0){
+									tempCurs--;
+								}
+								goto amRefresh;	
+								break;
+							case KEY_DOWN:
+								if(tempCurs + 1 < 4){
+									tempCurs++;
+								}
+								goto amRefresh;
+								break;
+							case 27:
+								delwin(am);
+								goto REFRESH;
+							default:
+								goto amRefresh;
+						}
+					} else if(cursLoc == 3){ //spells
+						tempCurs = 0;
+						WINDOW *sp;
+						sp = newwin(24, 80, 0, 0);
+						
+						spRefresh:;
+						
+						wrefresh(sp);
+						clear();
+						printw("###SPELLS###\n\n");
+						for(int k = 0; k < 5; k++){
+							printw("%d: %c", k + 1, equipment[characters[0].spells[k]].c);
+							if(k == tempCurs){
+								printw(" <<");
+							}
+							printw("\n");
+						}
+						printw("\n\nPress ESC to return");
+						spKey = getch();
+						switch(spKey){
+							case KEY_UP:
+								if(tempCurs - 1 >= 0){
+									tempCurs--;
+								}
+								goto spRefresh;	
+								break;
+							case KEY_DOWN:
+								if(tempCurs + 1 < 4){
+									tempCurs++;
+								}
+								goto spRefresh;
+								break;
+							case 27:
+								delwin(sp);
+								goto REFRESH;
+							default:
+								goto spRefresh;
+						}
+					} else if(cursLoc == 4){ //storage
+					// ge[NUM_STORAGE]; //stores items index. Can include anything, but should be used for equipment
+						tempCurs = 0;
+						WINDOW *st;
+						st = newwin(24, 80, 0, 0);
+						
+						stRefresh:;
+						
+						wrefresh(st);
+						clear();
+						printw("###STORAGE###\n\n");
+						for(int k = 0; k < NUM_STORAGE; k++){
+							printw("%d: %c", k + 1, equipment[characters[0].weapons[k]].c);
+							if(k == tempCurs){
+								printw(" <<");
+							}
+							printw("\n");
+						}
+						printw("\n\nPress ESC to return");
+						stKey = getch();
+						switch(stKey){
+							case KEY_UP:
+								if(tempCurs - 1 >= 0){
+									tempCurs--;
+								}
+								goto stRefresh;	
+								break;
+							case KEY_DOWN:
+								if(tempCurs + 1 < 4){
+									tempCurs++;
+								}
+								goto stRefresh;
+								break;
+							case 27:
+								delwin(st);
+								goto REFRESH;
+							default:
+								goto stRefresh;
+						}
+					}
+					goto REFRESH;
+				case 27:
+					goto DFT;
+					break;
+				default:
+					goto REFRESH;
+			}
+			break;
+		//-------------------------------------------------------------------------------------------------------------------------------
 		case 'i': //lists PC inventory/storage
 			WINDOW *i;
 			i = newwin(24, 80, 0, 0);
@@ -1667,6 +2069,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			INV:;
 			wrefresh(i);
 			clear();
+			printw("###INVENTORY###\n\n");
 			for(int k = 0; k < NUM_STORAGE; k++){
 				printw("<%d>: %c", k, equipment[characters[0].storage[k]].c);
 				if(k == cursLoc){
@@ -1674,7 +2077,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				}
 				printw("\n");
 			}
-			printw("Press ESC to return");
+			printw("\nPress ESC to return");
 			iKey = getch();
 			switch(iKey){
 				case KEY_UP:
@@ -1694,236 +2097,343 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				case 'w': //wear the item
 					if(equipment[characters[0].storage[cursLoc]].equipment.weapon){
 						if(characters[0].equiped[0] == -1){ //if its empty then place it there
-							characters[0].equiped[0] = characters[0].storage[cursLoc];
+							characters[0].equiped[0] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[0]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[0]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[0]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[0]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[0]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[0]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[0];
-							characters[0].s -= equipment[characters[0].equiped[0]].SB;
-							characters[0].health -= equipment[characters[0].equiped[0]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[0]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[0]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[0]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[0]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[0]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[0]].DodgeBonus;
 							characters[0].equiped[0] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[0]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[0]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[0]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[0]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[0]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[0]].DodgeBonus;
 						}
-						printw("You equiped the weapon: %c\n", equipment[characters[0].storage[cursLoc]]);
+						// printw("You equiped the weapon: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.offhand){
 						if(characters[0].equiped[1] == -1){ //if its empty then place it there
-							characters[0].equiped[1] = characters[0].storage[cursLoc];
+							characters[0].equiped[1] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[1]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[1]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[1]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[1]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[1]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[1]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[1];
-							characters[0].s -= equipment[characters[0].equiped[1]].SB;
-							characters[0].health -= equipment[characters[0].equiped[1]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[1]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[1]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[1]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[1]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[1]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[1]].DodgeBonus;
 							characters[0].equiped[1] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[1]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[1]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[1]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[1]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[1]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[1]].DodgeBonus;
 						}
-						printw("You equiped the offhand: %c\n", equipment[characters[0].storage[cursLoc]]);
+						// printw("You equiped the offhand: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.ranged){
 						if(characters[0].equiped[2] == -1){ //if its empty then place it there
-							characters[0].equiped[2] = characters[0].storage[cursLoc];
+							characters[0].equiped[2] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[2]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[2]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[2]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[2]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[2]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[2]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[2];
-							characters[0].s -= equipment[characters[0].equiped[2]].SB;
-							characters[0].health -= equipment[characters[0].equiped[2]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[2]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[2]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[2]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[2]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[2]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[2]].DodgeBonus;
 							characters[0].equiped[2] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[2]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[2]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[2]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[2]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[2]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[2]].DodgeBonus;
 						}
-						printw("You equiped the ranged weapon: %c\n", equipment[characters[0].storage[cursLoc]]);
+						// printw("You equiped the ranged weapon: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.armor){
 						if(characters[0].equiped[3] == -1){ //if its empty then place it there
-							characters[0].equiped[3] = characters[0].storage[cursLoc];
+							characters[0].equiped[3] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[3]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[3]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[3]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[3]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[3]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[3]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[3];
-							characters[0].s -= equipment[characters[0].equiped[3]].SB;
-							characters[0].health -= equipment[characters[0].equiped[3]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[3]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[3]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[3]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[3]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[3]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[3]].DodgeBonus;
 							characters[0].equiped[3] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[3]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[3]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[3]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[3]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[3]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[3]].DodgeBonus;
 						}
-						printw("You equiped the armor: %c\n", equipment[characters[0].storage[cursLoc]]);
+						// printw("You equiped the armor: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.helmet){
 						if(characters[0].equiped[4] == -1){ //if its empty then place it there
-							characters[0].equiped[4] = characters[0].storage[cursLoc];
+							characters[0].equiped[4] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[4]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[4]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[4]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[4]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[4]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[4]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[4];
-							characters[0].s -= equipment[characters[0].equiped[4]].SB;
-							characters[0].health -= equipment[characters[0].equiped[4]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[4]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[4]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[4]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[4]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[4]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[4]].DodgeBonus;
 							characters[0].equiped[4] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[4]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[4]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[4]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[4]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[4]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[4]].DodgeBonus;
 						}
-						printw("You equiped the helmet: %c\n", equipment[characters[0].storage[cursLoc]]);
+						// printw("You equiped the helmet: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.cloak){
 						if(characters[0].equiped[5] == -1){ //if its empty then place it there
-							characters[0].equiped[5] = characters[0].storage[cursLoc];
+							characters[0].equiped[5] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[5]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[5]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[5]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[5]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[5]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[5]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[5];
-							characters[0].s -= equipment[characters[0].equiped[5]].SB;
-							characters[0].health -= equipment[characters[0].equiped[5]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[5]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[5]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[5]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[5]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[5]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[5]].DodgeBonus;
 							characters[0].equiped[5] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[5]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[5]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[5]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[5]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[5]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[5]].DodgeBonus;
 						}
-						printw("You equiped the cloak: %c\n", equipment[characters[0].storage[cursLoc]]);
+						// printw("You equiped the cloak: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.gloves){
 						if(characters[0].equiped[6] == -1){ //if its empty then place it there
-							characters[0].equiped[6] = characters[0].storage[cursLoc];
+							characters[0].equiped[6] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[6]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[6]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[6]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[6]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[6]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[6]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[6];
-							characters[0].s -= equipment[characters[0].equiped[6]].SB;
-							characters[0].health -= equipment[characters[0].equiped[6]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[6]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[6]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[6]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[6]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[6]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[6]].DodgeBonus;
 							characters[0].equiped[6] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[6]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[6]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[6]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[6]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[6]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[6]].DodgeBonus;
 						}
-						printw("You equiped the gloves: %c\n", equipment[characters[0].storage[cursLoc]]);
+						// printw("You equiped the gloves: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.boots){
 						if(characters[0].equiped[7] == -1){ //if its empty then place it there
-							characters[0].equiped[7] = characters[0].storage[cursLoc];
+							characters[0].equiped[7] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[7]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[7]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[7]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[7]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[7]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[7]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[7];
-							characters[0].s -= equipment[characters[0].equiped[7]].SB;
-							characters[0].health -= equipment[characters[0].equiped[7]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[7]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[7]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[7]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[7]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[7]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[7]].DodgeBonus;
 							characters[0].equiped[7] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[7]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[7]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[7]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[7]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[7]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[7]].DodgeBonus;
 						}
-						printw("You equiped the boots: %c\n", equipment[characters[0].storage[cursLoc]]);
+						//printw("You equiped the boots: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.amulet){
 						if(characters[0].equiped[8] == -1){ //if its empty then place it there
-							characters[0].equiped[8] = characters[0].storage[cursLoc];
+							characters[0].equiped[8] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[8]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[8]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[8]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[8]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[8]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[8]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[8];
-							characters[0].s -= equipment[characters[0].equiped[8]].SB;
-							characters[0].health -= equipment[characters[0].equiped[8]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[8]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[8]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[8]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[8]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[8]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[8]].DodgeBonus;
 							characters[0].equiped[8] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[8]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[8]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[8]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[8]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[8]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[8]].DodgeBonus;
 						}
-						printw("You equiped the amulet: %c\n", equipment[characters[0].storage[cursLoc]]);
+						//printw("You equiped the amulet: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.light){
 						if(characters[0].equiped[9] == -1){ //if its empty then place it there
-							characters[0].equiped[9] = characters[0].storage[cursLoc];
+							characters[0].equiped[9] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[9]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[9]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[9]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[9]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[9]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[9]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[9];
-							characters[0].s -= equipment[characters[0].equiped[9]].SB;
-							characters[0].health -= equipment[characters[0].equiped[9]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[9]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[9]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[9]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[9]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[9]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[9]].DodgeBonus;
 							characters[0].equiped[9] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[9]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[9]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[9]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[9]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[9]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[9]].DodgeBonus;
 						}
-						printw("You equiped the light: %c\n", equipment[characters[0].storage[cursLoc]]);
+						//printw("You equiped the light: %c\n", equipment[characters[0].storage[cursLoc]]);
 					} else if(equipment[characters[0].storage[cursLoc]].equipment.ring){
 						if(characters[0].equiped[10] == -1){ //if its empty then place it there
-							characters[0].equiped[10] = characters[0].storage[cursLoc];
+							characters[0].equiped[10] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[10]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[10]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[10]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[10]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[10]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[10]].DodgeBonus;
 						} else if(characters[0].equiped[11] == -1){ //if its empty then place it there
-							characters[0].equiped[11] = characters[0].storage[cursLoc];
+							characters[0].equiped[11] = characters[0].storage[cursLoc]; //assign item to equiped
+							characters[0].storage[cursLoc] = -1; //remove from inventory
+							//apply boosts to stats
+							characters[0].s += equipment[characters[0].equiped[11]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[11]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[11]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[11]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[11]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[11]].DodgeBonus;
 						} else { //flip the character index locations from the storage and equiped if its occupied
-							isSwapped = true;
 							temp = characters[0].equiped[10];
-							characters[0].s -= equipment[characters[0].equiped[10]].SB;
-							characters[0].health -= equipment[characters[0].equiped[10]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							characters[0].s -= equipment[characters[0].equiped[10]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[10]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[10]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[10]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[10]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[10]].DodgeBonus;
 							characters[0].equiped[10] = characters[0].storage[cursLoc];
-							characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-							characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-							characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-							characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
 							characters[0].storage[cursLoc] = temp;
+							characters[0].s += equipment[characters[0].equiped[10]].SpeedBonus;
+							characters[0].health += equipment[characters[0].equiped[10]].DefenseBonus;
+							characters[0].attackDamage.base += equipment[characters[0].equiped[10]].DamageBonus.base;
+							characters[0].attackDamage.dice += equipment[characters[0].equiped[10]].DamageBonus.dice;
+							characters[0].attackDamage.sides += equipment[characters[0].equiped[10]].DamageBonus.sides;
+							characters[0].dodge += equipment[characters[0].equiped[10]].DodgeBonus;
 						}
-						printw("You equiped the armor: %c\n", equipment[characters[0].storage[cursLoc]]);
+						//printw("You equiped the armor: %c\n", equipment[characters[0].storage[cursLoc]]);
 					}
-					if(!isSwapped){
-						characters[0].s += equipment[characters[0].storage[cursLoc]].SB;
-						characters[0].health += equipment[characters[0].storage[cursLoc]].DFB;
-						characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DB.base;
-						characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DB.dice;
-						characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DB.sides;
-						characters[0].storage[cursLoc] = -1;
-					}
-					isSwapped = false;
+					// if(!isSwapped){
+						// characters[0].s += equipment[characters[0].storage[cursLoc]].SpeedBonus;
+						// characters[0].health += equipment[characters[0].storage[cursLoc]].DefenseBonus;
+						// characters[0].attackDamage.base += equipment[characters[0].storage[cursLoc]].DamageBonus.base;
+						// characters[0].attackDamage.dice += equipment[characters[0].storage[cursLoc]].DamageBonus.dice;
+						// characters[0].attackDamage.sides += equipment[characters[0].storage[cursLoc]].DamageBonus.sides;
+						// characters[0].storage[cursLoc] = -1;
+					// }
+					// isSwapped = false;
 					goto INV;
 					break;
 				case 'd': //drop the item
@@ -1933,9 +2443,14 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 						if(hardness[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == 0){ //Right
 							//if the space is open then don't worry about updating info
 							if(dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == '.' || dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] +  + randLocArr[randLoc][0]] == '#'){
+								equipment[characters[0].storage[cursLoc]].lv = dungeon[characters[0].pos[Y_LOC]  + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]];
 								dungeon[characters[0].pos[Y_LOC]  + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] = equipment[characters[0].storage[cursLoc]].c;
 								equipment[characters[0].storage[cursLoc]].pos[Y_LOC] = characters[0].pos[Y_LOC] + randLocArr[randLoc][1];
 								equipment[characters[0].storage[cursLoc]].pos[X_LOC] = characters[0].pos[X_LOC] + randLocArr[randLoc][0];
+								if(equipment[characters[0].storage[cursLoc]].equipment.trap){
+									equipment[characters[0].storage[cursLoc]].color.WHITE = false;
+									equipment[characters[0].storage[cursLoc]].color.RED = true;
+								}
 								isDropped = true;
 							} else { //space is occupied
 								for(int h = 0; h < *num_Mon; h++){ //find monster in space
@@ -1953,6 +2468,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 					}
 					isDropped = false;
 					printw("You dropped the item: %c\n", equipment[characters[0].storage[cursLoc]]);
+					equipment[characters[0].storage[cursLoc]].isHeld = false;
 					characters[0].storage[cursLoc] = -1; //the storage slot on the pc is emptied
 					goto INV;
 					break;
@@ -2033,17 +2549,17 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 					} else if(equipment[characters[0].storage[cursLoc]].color.WHITE){
 						printw("White\n");
 					} 
-					printw("HIT BONUS: %d\n", equipment[characters[0].storage[cursLoc]].HB);
-					printw("DAMAGE BONUS: %d+%dd%d\n", equipment[characters[0].storage[cursLoc]].DB.base, equipment[characters[0].storage[cursLoc]].DB.dice, equipment[characters[0].storage[cursLoc]].DB.sides);
-					printw("DODGE BONUS: %d\n", equipment[characters[0].storage[cursLoc]].DDB);
-					printw("DEFENSE BONUS: %d\n", equipment[characters[0].storage[cursLoc]].DFB);
+					printw("HIT BONUS: %d\n", equipment[characters[0].storage[cursLoc]].HitBonus);
+					printw("DAMAGE BONUS: %d+%dd%d\n", equipment[characters[0].storage[cursLoc]].DamageBonus.base, equipment[characters[0].storage[cursLoc]].DamageBonus.dice, equipment[characters[0].storage[cursLoc]].DamageBonus.sides);
+					printw("DODGE BONUS: %d\n", equipment[characters[0].storage[cursLoc]].DodgeBonus);
+					printw("DEFENSE BONUS: %d\n", equipment[characters[0].storage[cursLoc]].DefenseBonus);
 					printw("WEIGHT: %d\n", equipment[characters[0].storage[cursLoc]].weight);
-					printw("SPEED BONUS: %d\n", equipment[characters[0].storage[cursLoc]].SB);
+					printw("SPEED BONUS: %d\n", equipment[characters[0].storage[cursLoc]].SpeedBonus);
 					printw("VALUE: %d\n", equipment[characters[0].storage[cursLoc]].value);
 					printw("STATUS: %b\n", equipment[characters[0].storage[cursLoc]].status);
 					printw("RARITY: %d\n", equipment[characters[0].storage[cursLoc]].rarity);
 					printw("Y: %d X: %d\n", equipment[characters[0].storage[cursLoc]].pos[Y_LOC], equipment[characters[0].storage[cursLoc]].pos[X_LOC]);
-					printw("SPECIAL ATTRIBUTE: %b\n", equipment[characters[0].storage[cursLoc]].SA);
+					printw("SPECIAL ATTRIBUTE: %b\n", equipment[characters[0].storage[cursLoc]].SpecialAtr);
 					printw("\nPRESS ANY KEY TO EXIT");
 					iKey = getch();
 					switch(iKey){
@@ -2068,6 +2584,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			EQP:;
 			wrefresh(e);
 			clear();
+			printw("###EQUIPED###\n\n");
 			for(int k = 0; k < NUM_STORAGE + 2; k++){
 				if(k == 0){
 					printw("<a>: %c", equipment[characters[0].equiped[k]].c);
@@ -2100,7 +2617,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 				printw("\n");
 			}
 			
-			printw("Press ESC to return\n");
+			printw("\nPress ESC to return\n");
 			eKey = getch();
 			switch(eKey){
 				case KEY_UP:
@@ -2119,19 +2636,25 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 					break;
 				case 'd': //drop the item
 					equipment[characters[0].equiped[cursLoc]].isHeld = false; //item is destroyed when dropped but not expunged
-					characters[0].s -= equipment[characters[0].equiped[cursLoc]].SB;
-					characters[0].health -= equipment[characters[0].equiped[cursLoc]].DFB;
-					characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-					characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-					characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+					characters[0].s -= equipment[characters[0].equiped[cursLoc]].SpeedBonus;
+					characters[0].health -= equipment[characters[0].equiped[cursLoc]].DefenseBonus;
+					characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DamageBonus.base;
+					characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DamageBonus.dice;
+					characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DamageBonus.sides;
+					characters[0].dodge -= equipment[characters[0].equiped[cursLoc]].DodgeBonus;
 					while(!isDropped){
 						randLoc = rand() % 8;
 						if(hardness[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == 0){ //Right
 							//if the space is open then don't worry about updating info
 							if(dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] == '.' || dungeon[characters[0].pos[Y_LOC] + randLocArr[randLoc][1]][characters[0].pos[X_LOC] +  + randLocArr[randLoc][0]] == '#'){
+								equipment[characters[0].equiped[cursLoc]].lv = dungeon[characters[0].pos[Y_LOC]  + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]];
 								dungeon[characters[0].pos[Y_LOC]  + randLocArr[randLoc][1]][characters[0].pos[X_LOC] + randLocArr[randLoc][0]] = equipment[characters[0].equiped[cursLoc]].c;
 								equipment[characters[0].equiped[cursLoc]].pos[Y_LOC] = characters[0].pos[Y_LOC] + randLocArr[randLoc][1];
 								equipment[characters[0].equiped[cursLoc]].pos[X_LOC] = characters[0].pos[X_LOC] + randLocArr[randLoc][0];
+								if(equipment[characters[0].equiped[cursLoc]].equipment.trap){
+									equipment[characters[0].equiped[cursLoc]].color.WHITE = false;
+									equipment[characters[0].equiped[cursLoc]].color.RED = true;
+								}
 								isDropped = true;
 							} else { //space is occupied
 								for(int h = 0; h < *num_Mon; h++){ //find monster in space
@@ -2148,34 +2671,40 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 						}
 					}
 					isDropped = false;
-					printw("You dropped the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
+					// printw("You dropped the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
+					equipment[characters[0].equiped[cursLoc]].isHeld = false;
 					characters[0].equiped[cursLoc] = -1; //the equiped slot on the pc is emptied
 					goto EQP;
 					break;
 				case 'x': //delete the item
 					equipment[characters[0].equiped[cursLoc]].a = false; //item is destroyed when dropped
 					equipment[characters[0].equiped[cursLoc]].isHeld = false; //item is destroyed when expunged
-					characters[0].s -= equipment[characters[0].equiped[cursLoc]].SB;
-					characters[0].health -= equipment[characters[0].equiped[cursLoc]].DFB;
-					characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-					characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-					characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+					characters[0].s -= equipment[characters[0].equiped[cursLoc]].SpeedBonus;
+					characters[0].health -= equipment[characters[0].equiped[cursLoc]].DefenseBonus;
+					characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DamageBonus.base;
+					characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DamageBonus.dice;
+					characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DamageBonus.sides;
+					characters[0].dodge -= equipment[characters[0].equiped[cursLoc]].DodgeBonus;
 					characters[0].equiped[cursLoc] = -1; //the equiped slot on the pc is emptied
-					printw("You deleted the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
+					// printw("You deleted the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
 					goto EQP;
 					break;
 				case 't': //take off item
 					for(int m = 0; m < NUM_STORAGE; m++){
 						if(characters[0].storage[m] == -1){
+							//decrement boosts to stats
 							characters[0].storage[m] = characters[0].equiped[cursLoc];
-							printw("You took off the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
-							characters[0].s -= equipment[characters[0].equiped[cursLoc]].SB;
-							characters[0].health -= equipment[characters[0].equiped[cursLoc]].DFB;
-							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DB.base;
-							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DB.dice;
-							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DB.sides;
+							// printw("You took off the item: %c\n", equipment[characters[0].equiped[cursLoc]]);
+							characters[0].s -= equipment[characters[0].equiped[cursLoc]].SpeedBonus;
+							characters[0].health -= equipment[characters[0].equiped[cursLoc]].DefenseBonus;
+							characters[0].attackDamage.base -= equipment[characters[0].equiped[cursLoc]].DamageBonus.base;
+							characters[0].attackDamage.dice -= equipment[characters[0].equiped[cursLoc]].DamageBonus.dice;
+							characters[0].attackDamage.sides -= equipment[characters[0].equiped[cursLoc]].DamageBonus.sides;
+							characters[0].dodge -= equipment[characters[0].equiped[cursLoc]].DodgeBonus;
 							characters[0].equiped[cursLoc] = -1;
 							takenOff = true;
+						} else {
+							//message??
 						}
 					}
 					if(!takenOff){
@@ -2253,17 +2782,17 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 					} else if(equipment[characters[0].equiped[cursLoc]].color.WHITE){
 						printw("White\n");
 					} 
-					printw("HIT BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].HB);
-					printw("DAMAGE BONUS: %d+%dd%d\n", equipment[characters[0].equiped[cursLoc]].DB.base, equipment[characters[0].equiped[cursLoc]].DB.dice, equipment[characters[0].equiped[cursLoc]].DB.sides);
-					printw("DODGE BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].DDB);
-					printw("DEFENSE BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].DFB);
+					printw("HIT BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].HitBonus);
+					printw("DAMAGE BONUS: %d+%dd%d\n", equipment[characters[0].equiped[cursLoc]].DamageBonus.base, equipment[characters[0].equiped[cursLoc]].DamageBonus.dice, equipment[characters[0].equiped[cursLoc]].DamageBonus.sides);
+					printw("DODGE BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].DodgeBonus);
+					printw("DEFENSE BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].DefenseBonus);
 					printw("WEIGHT: %d\n", equipment[characters[0].equiped[cursLoc]].weight);
-					printw("SPEED BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].SB);
+					printw("SPEED BONUS: %d\n", equipment[characters[0].equiped[cursLoc]].SpeedBonus);
 					printw("VALUE: %d\n", equipment[characters[0].equiped[cursLoc]].value);
 					printw("STATUS: %b\n", equipment[characters[0].equiped[cursLoc]].status);
 					printw("RARITY: %d\n", equipment[characters[0].equiped[cursLoc]].rarity);
 					printw("Y: %d X: %d\n", equipment[characters[0].equiped[cursLoc]].pos[Y_LOC], equipment[characters[0].equiped[cursLoc]].pos[X_LOC]);
-					printw("SPECIAL ATTRIBUTE: %b\n", equipment[characters[0].equiped[cursLoc]].SA);
+					printw("SPECIAL ATTRIBUTE: %b\n", equipment[characters[0].equiped[cursLoc]].SpecialAtr);
 					printw("\nPRESS ANY KEY TO EXIT");
 					eKey = getch();
 					switch(eKey){
@@ -2396,128 +2925,52 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			}
 			cmnd = getch();
 			switch(cmnd){
-				case 'y': //UP-LEFT
-					HM:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] - 1] != 255){
-						characters[0].pos[Y_LOC] -= 1;
-						characters[0].pos[X_LOC] -= 1;
-					}
-					goto LCS;
-					break;
-				case '7': //UP-LEFT
-					goto HM; //Goes to default UP-LEFT case
-					break;
-				case KEY_HOME: //UP-LEFT
-					goto HM; //Goes to default UP-LEFT case
-					break;
+				// case 'y': //UP-LEFT
+					// HM:;
+					// //Update '*' position
+					// if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] - 1] != 255){
+						// characters[0].pos[Y_LOC] -= 1;
+						// characters[0].pos[X_LOC] -= 1;
+					// }
+					// goto LCS;
+					// break;
+				// case '7': //UP-LEFT
+					// goto HM; //Goes to default UP-LEFT case
+					// break;
+				// case KEY_HOME: //UP-LEFT
+					// goto HM; //Goes to default UP-LEFT case
+					// break;
 				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'k': //UP
-					UPS:;
+				case KEY_UP: //UP
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC]] != 255){
 						characters[0].pos[Y_LOC] -= 1;
 					}
 					goto LCS;
 					break;
-				case '8': //UP
-					goto UPS; //Goes to default UP case
-					break;
-				case KEY_UP: //UP
-					goto UPS; //Goes to default UP case
-					break;
 				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'u': //UP-RIGHT
-					URS:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] + 1] != 255){
-						characters[0].pos[Y_LOC] -= 1;
-						characters[0].pos[X_LOC] += 1;
-					}
-					goto LCS;
-					break;
-				case '9': //UP-RIGHT
-					goto URS; //Goes to default UP-RIGHT case
-					break;
-				case KEY_PPAGE: //UP-RIGHT
-					goto URS; //Goes to default UP-RIGHT case
-					break;
-				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'l': //RIGHT
-					RGS:;
+				case KEY_RIGHT: //RIGHT
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] + 1] != 255){
 						characters[0].pos[X_LOC] += 1;
 					}
 					goto LCS;
 					break;
-				case '6': //RIGHT
-					goto RGS; //Goes to default RIGHT case
-					break;
-				case KEY_RIGHT: //RIGHT
-					goto RGS; //Goes to default RIGHT case
-					break;
 				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'n': //DOWN-RIGHT
-					DRS:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] + 1] != 255){
-						characters[0].pos[Y_LOC] += 1;
-						characters[0].pos[X_LOC] += 1;
-					}
-					goto LCS;
-					break;
-				case '3': //DOWN-RIGHT
-					goto DRS; //Goes to default DOWN-RIGHT case
-					break;
-				case KEY_NPAGE: //DOWN-RIGHT
-					goto DRS; //Goes to default DOWN-RIGHT case 
-					break;
-				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'j': //DOWN
-					DS:;
+				case KEY_DOWN: //DOWN
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC]] != 255){
 						characters[0].pos[Y_LOC] += 1;
 					}
 					goto LCS;
 					break;
-				case '2': //DOWN
-					goto DS; //Goes to default DOWN case
-					break;
-				case KEY_DOWN: //DOWN
-					goto DS; //Goes to default DOWN case
-					break;
 				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'b': //DOWN-LEFT
-					DLS:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] - 1] != 255){
-						characters[0].pos[Y_LOC] += 1;
-						characters[0].pos[X_LOC] -= 1;
-					}
-					goto LCS;
-					break;
-				case '1': //DOWN-LEFT
-					goto DLS; //Goes to default DOWN-LEFT case
-					break;
-				case KEY_END: //DOWN-LEFT
-					goto DLS; //Goes to default DOWN-LEFT case
-					break;
-				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'h': //LEFT
-					LFS:;
+				case KEY_LEFT: //LEFT
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] - 1] != 255){
 						characters[0].pos[X_LOC] -= 1;
 					}
 					goto LCS;
-					break;
-				case '4': //LEFT
-					goto LFS; //Goes to default LEFT case
-					break;
-				case KEY_LEFT: //LEFT
-					goto LFS; //Goes to default LEFT case
 					break;
 				case 't': //Look at item or monster info
 					if(characters[0].pos[X_LOC] != ' ' || characters[0].pos[X_LOC] != '.' || characters[0].pos[X_LOC] != '#'){
@@ -2599,11 +3052,11 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 						break;
 					case 27:
 						//reset all the info
-						characters[0].pos[Y_LOC] = dungeon[tempY][tempX];
 						characters[0].pos[Y_LOC] = tempY;
 						characters[0].pos[X_LOC] = tempX;
 						dungeon[tempY][tempX] = characters[0].c;
 						fogDungeon[tempY][tempX] = characters[0].c;
+						goto DFT;
 						break;
 					default:
 						goto OOPS;
@@ -2626,7 +3079,8 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 						mvaddch(row, col, '*');
 					} else { //print normal dungeon
 						if(dungeon[row][col] == '.' || dungeon[row][col] == '#' || dungeon[row][col] == ' ' || dungeon[row][col] == '|' 
-						|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>'){ //always white
+						|| dungeon[row][col] == '-' || dungeon[row][col] == '@' || dungeon[row][col] == '<' || dungeon[row][col] == '>' ||
+						dungeon[row][col] == '+' || dungeon[row][col] == '`'){ //always white
 						mvaddch(row, col, dungeon[row][col]);
 						} else {
 							j = 0;
@@ -2727,128 +3181,36 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			}
 			cmnd = getch();
 			switch(cmnd){
-				case 'y': //UP-LEFT
-					UL:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] - 1] != 255){
-						characters[0].pos[Y_LOC] -= 1;
-						characters[0].pos[X_LOC] -= 1;
-					}
-					goto BSC;
-					break;
-				case '7': //UP-LEFT
-					goto UL; //Goes to default UP-LEFT case
-					break;
-				case KEY_HOME: //UP-LEFT
-					goto UL; //Goes to default UP-LEFT case
-					break;
-				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'k': //UP
-					UP:;
+				case KEY_UP: //UP
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC]] != 255){
 						characters[0].pos[Y_LOC] -= 1;
 					}
 					goto BSC;
 					break;
-				case '8': //UP
-					goto UP; //Goes to default UP case
-					break;
-				case KEY_UP: //UP
-					goto UP; //Goes to default UP case
-					break;
 				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'u': //UP-RIGHT
-					UR:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] - 1][characters[0].pos[X_LOC] + 1] != 255){
-						characters[0].pos[Y_LOC] -= 1;
-						characters[0].pos[X_LOC] += 1;
-					}
-					goto BSC;
-					break;
-				case '9': //UP-RIGHT
-					goto UR; //Goes to default UP-RIGHT case
-					break;
-				case KEY_PPAGE: //UP-RIGHT
-					goto UR; //Goes to default UP-RIGHT case
-					break;
-				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'l': //RIGHT
-					RG:;
+				case KEY_RIGHT: //RIGHT
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] + 1] != 255){
 						characters[0].pos[X_LOC] += 1;
 					}
 					goto BSC;
 					break;
-				case '6': //RIGHT
-					goto RG; //Goes to default RIGHT case
-					break;
-				case KEY_RIGHT: //RIGHT
-					goto RG; //Goes to default RIGHT case
-					break;
 				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'n': //DOWN-RIGHT
-					DR:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] + 1] != 255){
-						characters[0].pos[Y_LOC] += 1;
-						characters[0].pos[X_LOC] += 1;
-					}
-					goto BSC;
-					break;
-				case '3': //DOWN-RIGHT
-					goto DR; //Goes to default DOWN-RIGHT case
-					break;
-				case KEY_NPAGE: //DOWN-RIGHT
-					goto DR; //Goes to default DOWN-RIGHT case 
-					break;
-				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'j': //DOWN
-					D:;
+				case KEY_DOWN: //DOWN
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC]] != 255){
 						characters[0].pos[Y_LOC] += 1;
 					}
 					goto BSC;
 					break;
-				case '2': //DOWN
-					goto D; //Goes to default DOWN case
-					break;
-				case KEY_DOWN: //DOWN
-					goto D; //Goes to default DOWN case
-					break;
 				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'b': //DOWN-LEFT
-					DL:;
-					//Update '*' position
-					if(hardness[characters[0].pos[Y_LOC] + 1][characters[0].pos[X_LOC] - 1] != 255){
-						characters[0].pos[Y_LOC] += 1;
-						characters[0].pos[X_LOC] -= 1;
-					}
-					goto BSC;
-					break;
-				case '1': //DOWN-LEFT
-					goto DL; //Goes to default DOWN-LEFT case
-					break;
-				case KEY_END: //DOWN-LEFT
-					goto DL; //Goes to default DOWN-LEFT case
-					break;
-				//-------------------------------------------------------------------------------------------------------------------------------	
-				case 'h': //LEFT
-					LF:;
+				case KEY_LEFT: //LEFT
 					//Update '*' position
 					if(hardness[characters[0].pos[Y_LOC]][characters[0].pos[X_LOC] - 1] != 255){
 						characters[0].pos[X_LOC] -= 1;
 					}
 					goto BSC;
-					break;
-				case '4': //LEFT
-					goto LF; //Goes to default LEFT case
-					break;
-				case KEY_LEFT: //LEFT
-					goto LF; //Goes to default LEFT case
 					break;
 				case 'r': //random location
 					//with these random values we can never reach the immutable rock
@@ -2894,7 +3256,7 @@ void User_Input(Character_t characters[MAX_MONSTERS], int *num_Mon, char dungeon
 			}
 			break;
 		default:
-			errorMessage = 3;
+			message = 100;
 			goto CMD;
 			break;
 	}
@@ -2959,14 +3321,6 @@ void generateMonsters(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGHT
 			characters[0].nt = 0;
 			characters[0].sn = 0;
 			characters[i].a = true;
-			characters[0].health = DEF_HEALTH;
-			characters[0].attackDamage.base = 0;
-			characters[0].attackDamage.dice = 1;
-			characters[0].attackDamage.sides = 4;
-			for(int m = 0; m < NUM_STORAGE; m++){ //sets the default arrays to be 'empty'
-				characters[0].storage[m] = -1;
-				characters[0].equiped[m] = -1;
-			}
 		} else {
 			int rarityNum = rand() % 100;
 			if(rarityNum < characters[i].rarity && characters[i].a){ //if the rarity num is less than the monsters rarity and its alive
@@ -3003,7 +3357,9 @@ void generateEquipment(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGH
 	int i = 0;
 	int	numEquip = 0;
 	int minEquip = 10;
-	int randomX, randomY;
+	int randomX, randomY, randLight, randDebris, randJewels;
+	int numLight = 0;
+	int numDebris = 0;
 	bool equipPlaced = false;
 	while(i <= *num_Equip && numEquip < minEquip){ //generate all the equipment and place them if rarity allows
 		int rarityNum = rand() % 100;
@@ -3029,6 +3385,30 @@ void generateEquipment(char dungeon[WINDOW_Y][WINDOW_X], int hardness[GAME_HEIGH
 		i++;
 		if(i == *num_Equip && numEquip < minEquip){ //looped through once, go through again to get at least 10 items
 			i = 0;
+		}
+	}
+	
+	//'+': light
+	//'`': debris
+	//randomly adds debris and light to the dungeon, unable to pick up
+	randLight = 1 + rand() % 5;
+	randDebris = 1 + rand() % 5;
+	
+	while(numLight < randLight){
+		randomY = 1 + rand() % GAME_HEIGHT - 1;
+		randomX = 1 + rand() % GAME_WIDTH - 2;
+		if(dungeon[randomY][randomX] == '.'){
+			dungeon[randomY][randomX] = '+';
+			numLight++;
+		}
+	}
+	
+	while(numDebris < randDebris){
+		randomY = 1 + rand() % GAME_HEIGHT - 1;
+		randomX = 1 + rand() % GAME_WIDTH - 2;
+		if(dungeon[randomY][randomX] == '.'){
+			dungeon[randomY][randomX] = '`';
+			numDebris++;
 		}
 	}
 }
@@ -3169,6 +3549,18 @@ void simulateGame(Character_t characters[MAX_MONSTERS], int *num_Mon, char dunge
 	bool gameOver = true;
 	
 	generateMonsters(dungeon, hardness, PC, num_Mon, characters, rooms, number_of_rooms); //generate the PC and the monsters
+	characters[0].health = DEF_HEALTH;
+	characters[0].attackDamage.base = 0;
+	characters[0].attackDamage.dice = 1;
+	characters[0].attackDamage.sides = 4;
+	for(int m = 0; m < NUM_STORAGE; m++){ //sets the default arrays to be -1, which signifies an empty slot
+		characters[0].storage[m] = -1;
+		characters[0].equiped[m] = -1;
+		// characters[0].weapons[m] = -1;
+		// characters[0].spells[m] = -1; 
+		// characters[0].armor[m] = -1;
+		// characters[0].ammunition[m] = -1;
+	}
 	generateEquipment(dungeon, hardness, num_Equip, equipment); //generates and places the equipment
  	
 	int inSight = FALSE;
@@ -3761,7 +4153,7 @@ void parseMonstFile(const char* monst_file, Character_t characters[MAX_MONSTERS]
 void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], int *num_Equip){
 	ifstream f(equip_file);
 	string testChar;
-	int i = 1;
+	int i = 0;
 	int j = 0;
 	int maxDesc = 78;
 	int tempSides, tempDice, k;
@@ -3869,6 +4261,9 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 					} else if(!s.compare("CONTAINER")){
 						equipment[i].equipment.container = true;
 						equipment[i].c = '%';
+					} else if(!s.compare("TRAP")){
+						equipment[i].equipment.trap = true;
+						equipment[i].c = 'T';
 					}
 					compType = true;
 					// cout << s << endl;
@@ -3995,7 +4390,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].HB = stoi(s1);
+							equipment[i].HitBonus = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
@@ -4013,9 +4408,9 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						
 					}
 					for(k = 0; k < tempDice; k++){
-						equipment[i].HB += 1 + rand() % tempSides;
+						equipment[i].HitBonus += 1 + rand() % tempSides;
 					}
-					// cout << equipment[i].HB << endl;
+					// cout << equipment[i].HitBonus << endl;
 				} else if(!s.compare("DAM")){
 					s = "";
 					s1 = "";
@@ -4028,23 +4423,23 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].DB.base = stoi(s1);
+							equipment[i].DamageBonus.base = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
-							equipment[i].DB.dice = stoi(s1);
+							equipment[i].DamageBonus.dice = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("\n")){
 							s.erase(s.length()-1);
 							s.erase(s.length()-1);
 							s1.erase(s1.length()-1);
 							s1.erase(s1.length()-1);
-							equipment[i].DB.sides = stoi(s1);
+							equipment[i].DamageBonus.sides = stoi(s1);
 							readingInfo = false;
 							compDam = true;
 						}
 					}
-					// cout << equipment[i].DB.base << "+" << equipment[i].DB.dice << "d" << equipment[i].DB.sides << endl;
+					// cout << equipment[i].DamageBonus.base << "+" << equipment[i].DamageBonus.dice << "d" << equipment[i].DamageBonus.sides << endl;
 				} else if(!s.compare("ATTR")){
 					s = "";
 					s1 = "";
@@ -4057,7 +4452,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].SA = stoi(s1);
+							equipment[i].SpecialAtr = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
@@ -4075,9 +4470,9 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						
 					}
 					for(k = 0; k < tempDice; k++){
-						equipment[i].SA += 1 + rand() % tempSides;
+						equipment[i].SpecialAtr += 1 + rand() % tempSides;
 					}
-					// cout << equipment[i].SA << endl;
+					// cout << equipment[i].SpecialAtr << endl;
 				} else if(!s.compare("VAL")){
 					s = "";
 					s1 = "";
@@ -4123,7 +4518,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].DDB = stoi(s1);
+							equipment[i].DodgeBonus = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
@@ -4141,9 +4536,9 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						
 					}
 					for(k = 0; k < tempDice; k++){
-						equipment[i].DDB += 1 + rand() % tempSides;
+						equipment[i].DodgeBonus += 1 + rand() % tempSides;
 					}
-					// cout << equipment[i].DDB << endl;
+					// cout << equipment[i].DodgeBonus << endl;
 				} else if(!s.compare("DEF")){
 					s = "";
 					s1 = "";
@@ -4156,7 +4551,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].DFB = stoi(s1);
+							equipment[i].DefenseBonus = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
@@ -4174,9 +4569,9 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						
 					}
 					for(k = 0; k < tempDice; k++){
-						equipment[i].DFB += 1 + rand() % tempSides;
+						equipment[i].DefenseBonus += 1 + rand() % tempSides;
 					}
-					// cout << equipment[i].DFB << endl;
+					// cout << equipment[i].DefenseBonus << endl;
 				} else if(!s.compare("SPEED")){
 					s = "";
 					s1 = "";
@@ -4189,7 +4584,7 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						s += s2;
 						if(!s2.compare("+")){
 							s1.erase(s1.length()-1);
-							equipment[i].SB = stoi(s1);
+							equipment[i].SpeedBonus = stoi(s1);
 							s1 = "";
 						} else if(!s2.compare("d")){
 							s1.erase(s1.length()-1);
@@ -4207,9 +4602,9 @@ void parseObjFile(const char* equip_file, Equipment equipment[MAX_EQUIPMENT], in
 						
 					}
 					for(k = 0; k < tempDice; k++){
-						equipment[i].SB += 1 + rand() % tempSides;
+						equipment[i].SpeedBonus += 1 + rand() % tempSides;
 					}
-					// cout << equipment[i].SB << endl;
+					// cout << equipment[i].SpeedBonus << endl;
 				} else if(!s.compare("RRTY")){
 					s = "";
 					f.get();
@@ -4410,6 +4805,41 @@ int main(int argc, char *argv[]){
 		}
 	} else {
 		// cout << "Please enter: <--save, --load, --load--save> after './game' to perform an action";
+		int input;
+		WINDOW *w;
+		w = newwin(40, 80, 0, 0);
+		wrefresh(w);
+		clear();
+		printw("Welcome to the Chad's Dungeon Game!\n\n");
+		printw("The game is simple. You are lonely PC in a dungeon surrounded by monsters\nand equipment\n");
+		printw("You can pick up the equipment for increased PC specs. \nYou can attack the monsters by attacking their characters position\n");
+		printw("You can move up and down the dungeon floors when on top of staircases (< or >).\n");
+		printw("You can teleport, but you may not teleport on top of a monster.\n");
+		printw("To win the game you must kill every monster on that level\n");
+		printw("\nPress any key to view the commands\n");
+		input = getch();
+		switch(input){
+			default:
+				break;
+		}
+		wrefresh(w);
+		clear();
+		printw("Basic PC Commands:\nKEY_UP: Move Up\nKEY_RIGHT: Move Right\nKEY_DOWN: Move Down\nKEY_LEFT: Move Left\n>: Go Down Stairs\n<: Go Up Stairs\n.: Rest PC\nm: Display Monsters\nQ: Quit\ni: Inventory\n");
+		printw("t: Teleport\n	Key Pads: Move to teleport destination\n	t: Teleport to that space\n 	r: Teleport to a random location\n");
+		printw("l: Light debris on fire\n");
+		printw("s: Shoot a monster with your ranged weapon\n");
+		printw("f: View entire dungeon without fog\n");
+		printw("i: View PC inventory\n	KEY_UP: Move up list of equipment\n	KEY_DOWN: Move down list of equipment\n	w: Wear the item\n	d: Drop the item\n	x: Delete the item\n	I: View item information\n	Esc: Return to the game\n");
+		printw("e: View PC inventory\n	KEY_UP: Move up list of equipment\n	KEY_DOWN: Move down list of equipment\n	t: Take off the item\n	d: Drop the item\n	x: Delete the item\n	I: View item information\n	Esc: Return to the game\n");
+		printw("L: Enter viewing window\n	NUM_KEYS: Move location\n	t: View monster information\n	Esc: Return to game\n");
+		printw("Q: Quit game\n");
+		printw("\nPress any key to enter the game\n");
+		input = getch();
+		switch(input){
+			default:
+				break;
+		}
+		endwin();
 		parseMonstFile(monst_file, characters, &num_Mon);
 		parseObjFile(obj_file, equipment, &num_Equip);
 		generateNewFloor(dungeon, hardness, roomMap, wholeMap, PC, upwardCases, downwardCases, &number_of_upstairs, &number_of_downstairs, rooms, &number_of_rooms, 0, &num_Mon, characters, fogDungeon);
